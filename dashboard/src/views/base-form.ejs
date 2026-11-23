@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= modo === 'novo' ? 'Novo item' : 'Editar item' %> — Base de conhecimento</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>
+      <%= modo === 'novo' ? 'Novo item da base' : 'Editar item da base' %>
+      <% if (situacao) { %><span class="badge badge-<%= situacao.visual %>"><%= situacao.rotulo %></span><% } %>
+    </h1>
+    <div class="header-user">
+      <a href="/base">← Base de conhecimento</a>
+      <span><%= atendente.nome %></span>
+      <form method="POST" action="/logout"><button class="link-button">Sair</button></form>
+    </div>
+  </header>
+
+  <% if (aviso) { %>
+    <div class="flash flash-<%= aviso.tipo %>" role="status"><%= aviso.texto %></div>
+  <% } %>
+  <% if (erroGeral) { %>
+    <div class="flash flash-erro" role="alert"><%= erroGeral %></div>
+  <% } %>
+
+  <main class="conteudo-form">
+    <form class="form-base" method="POST" action="<%= modo === 'novo' ? '/base' : '/base/' + id %>" id="form-item">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+      <label for="titulo">Título</label>
+      <input type="text" id="titulo" name="titulo" maxlength="<%= limites.titulo %>" value="<%= valores.titulo %>" required <%= valores.titulo ? '' : 'autofocus' %>>
+      <% if (erros.titulo) { %><p class="erro-campo"><%= erros.titulo %></p><% } %>
+      <p class="dica">O bot cita o título como fonte da resposta, por exemplo “(Fonte: Entrega de atestado médico)”. Escolha um título que faça sentido para quem lê.</p>
+
+      <label for="conteudo">Conteúdo</label>
+      <textarea id="conteudo" name="conteudo" rows="14" maxlength="<%= limites.conteudo %>" required <%= (modo === 'novo' && valores.titulo && !valores.conteudo) ? 'autofocus' : '' %>><%= valores.conteudo %></textarea>
+      <span class="contador"><span id="contador-atual">0</span> / <%= limites.conteudo %> caracteres</span>
+      <% if (erros.conteudo) { %><p class="erro-campo"><%= erros.conteudo %></p><% } %>
+      <p class="dica">
+        Conteúdo curto (até 800 caracteres, como uma FAQ com pergunta e resposta juntas) vira um único trecho de busca.
+        Textos maiores são divididos em trechos de 800 caracteres, com 100 de sobreposição.
+      </p>
+
+      <% if (modo === 'editar') { %>
+        <p class="dica dica-destaque">
+          Mudar só o título não reindexa. Mudar o conteúdo reindexa: o item fica fora das respostas do bot por alguns segundos, até o n8n terminar.
+        </p>
+      <% } %>
+
+      <div class="form-acoes">
+        <a class="btn" href="/base">Cancelar</a>
+        <button type="submit" class="btn btn-primario" id="botao-salvar">Salvar</button>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    const campo = document.getElementById('conteudo');
+    const contador = document.getElementById('contador-atual');
+    const atualizarContador = () => { contador.textContent = String(campo.value.length); };
+    campo.addEventListener('input', atualizarContador);
+    atualizarContador();
+
+    // Evita salvar duas vezes se o botão for clicado de novo enquanto o servidor responde.
+    document.getElementById('form-item').addEventListener('submit', () => {
+      const botao = document.getElementById('botao-salvar');
+      botao.disabled = true;
+      botao.textContent = 'Salvando…';
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Métricas — Dashboard</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="sem-impressao">
+    <h1>Métricas</h1>
+    <div class="header-user">
+      <a href="/">← Conversas</a>
+      <a href="/base">Base de conhecimento</a>
+      <span><%= atendente.nome %></span>
+      <form method="POST" action="/logout"><button class="link-button">Sair</button></form>
+    </div>
+  </header>
+
+  <% if (aviso) { %>
+    <div class="flash flash-<%= aviso.tipo %> sem-impressao" role="status"><%= aviso.texto %></div>
+  <% } %>
+
+  <form class="filtro-periodo sem-impressao" method="GET" action="/metricas">
+    <div class="atalhos">
+      <% atalhos.forEach((a) => { %>
+        <a class="atalho<%= (a.de === periodo.de && a.ate === periodo.ate) ? ' atalho-ativo' : '' %>" href="/metricas?de=<%= a.de %>&amp;ate=<%= a.ate %>"><%= a.rotulo %></a>
+      <% }) %>
+    </div>
+    <label>De <input type="date" name="de" value="<%= periodo.de %>" required></label>
+    <label>até <input type="date" name="ate" value="<%= periodo.ate %>" required></label>
+    <button type="submit" class="btn">Aplicar</button>
+    <span class="filtro-acoes">
+      <a class="btn" href="/metricas/exportar.csv?tipo=resumo&amp;de=<%= periodo.de %>&amp;ate=<%= periodo.ate %>">CSV: resumo</a>
+      <a class="btn" href="/metricas/exportar.csv?tipo=conversas&amp;de=<%= periodo.de %>&amp;ate=<%= periodo.ate %>">CSV: conversas</a>
+      <a class="btn" href="/metricas/exportar.csv?tipo=lacunas&amp;de=<%= periodo.de %>&amp;ate=<%= periodo.ate %>">CSV: sem resposta</a>
+      <button type="button" class="btn" id="imprimir">Imprimir / PDF</button>
+    </span>
+  </form>
+
+  <h2 class="so-impressao">Métricas do atendimento</h2>
+  <p class="periodo-info">
+    Período: <strong><%= fmt.dataBR(periodo.de) %> a <%= fmt.dataBR(periodo.ate) %></strong>
+    (<%= r.periodo.dias %> <%= r.periodo.dias === 1 ? 'dia' : 'dias' %>, horário de São Paulo) · gerado em <%= geradoEm %>
+  </p>
+
+  <main class="metricas">
+    <section class="cartao">
+      <h2>Volume</h2>
+      <p class="numero-grande"><%= fmt.num(r.volume.conversas_ativas) %> <small>conversas ativas</small></p>
+      <dl class="detalhes">
+        <div><dt>Mensagens do usuário</dt><dd><%= fmt.num(r.volume.mensagens_usuario) %></dd></div>
+        <div><dt>Respostas do bot</dt><dd><%= fmt.num(r.volume.respostas_bot) %></dd></div>
+        <div><dt>Usuários ativos</dt><dd><%= fmt.num(r.volume.usuarios_ativos) %></dd></div>
+        <div><dt>Conversas novas</dt><dd><%= fmt.num(r.volume.conversas_novas) %></dd></div>
+        <div><dt>Usuários novos</dt><dd><%= fmt.num(r.volume.usuarios_novos) %></dd></div>
+      </dl>
+    </section>
+
+    <section class="cartao">
+      <h2>Satisfação</h2>
+      <p class="numero-grande"><%= fmt.pct(r.satisfacao.percentual) %> <small>de 👍</small></p>
+      <dl class="detalhes">
+        <div><dt>👍 positivas</dt><dd><%= fmt.num(r.satisfacao.positivas) %></dd></div>
+        <div><dt>👎 negativas</dt><dd><%= fmt.num(r.satisfacao.negativas) %></dd></div>
+        <div><dt>Respostas avaliadas</dt><dd><%= fmt.num(r.satisfacao.avaliadas) %> de <%= fmt.num(r.satisfacao.respostas_avaliaveis) %></dd></div>
+        <div><dt>Taxa de avaliação</dt><dd><%= fmt.pct(r.satisfacao.taxa_avaliacao) %></dd></div>
+      </dl>
+    </section>
+
+    <section class="cartao">
+      <h2>Atendimento humano</h2>
+      <p class="numero-grande"><%= fmt.pct(r.atendimento.taxa_resolucao_bot) %> <small>resolvidas pelo bot</small></p>
+      <dl class="detalhes">
+        <div><dt>Taxa de handoff</dt><dd><%= fmt.pct(r.atendimento.taxa_handoff) %> (<%= r.atendimento.conversas_com_pedido %> de <%= r.atendimento.conversas %>)</dd></div>
+        <div><dt>Pedidos de atendente</dt><dd><%= fmt.num(r.atendimento.pedidos) %></dd></div>
+        <div><dt>Pedidos atendidos</dt><dd><%= fmt.num(r.atendimento.pedidos_atendidos) %></dd></div>
+        <div><dt>Pedidos sem atendimento (voltaram ao bot)</dt><dd><%= fmt.num(r.atendimento.pedidos_abandonados) %></dd></div>
+        <div><dt>Pedidos ainda na fila</dt><dd><%= fmt.num(r.atendimento.pedidos_na_fila) %></dd></div>
+      </dl>
+    </section>
+
+    <section class="cartao">
+      <h2>Fila e atendimento</h2>
+      <p class="numero-grande"><%= fmt.num(r.fila.esperando_agora) %> <small>esperando agora</small></p>
+      <dl class="detalhes">
+        <% if (r.fila.mais_antiga_s !== null) { %><div><dt>Espera mais longa agora</dt><dd><%= fmt.duracao(r.fila.mais_antiga_s) %></dd></div><% } %>
+        <div><dt>Em atendimento agora</dt><dd><%= fmt.num(r.fila.em_atendimento_agora) %></dd></div>
+        <div><dt>Espera na fila (mediana)</dt><dd><%= fmt.duracao(r.fila.espera.mediana_s) %></dd></div>
+        <div><dt>Duração do atendimento (mediana)</dt><dd><%= fmt.duracao(r.duracao.mediana_s) %></dd></div>
+        <div><dt>Pedidos atendidos (base da espera)</dt><dd><%= fmt.num(r.fila.espera.n) %></dd></div>
+        <div><dt>Atendimentos concluídos (base da duração)</dt><dd><%= fmt.num(r.duracao.n) %></dd></div>
+        <div><dt>Atendimentos em andamento</dt><dd><%= fmt.num(r.duracao.em_andamento) %></dd></div>
+      </dl>
+    </section>
+  </main>
+
+  <section class="graficos">
+    <figure class="cartao">
+      <figcaption>Conversas ativas por dia</figcaption>
+      <%- graficoConversas %>
+    </figure>
+    <figure class="cartao">
+      <figcaption>Mensagens do usuário por dia</figcaption>
+      <%- graficoMensagens %>
+    </figure>
+  </section>
+
+  <section class="lacunas">
+    <h2>Perguntas sem resposta <small>(lacunas na base)</small></h2>
+    <% if (r.lacunas.length === 0) { %>
+      <p class="vazio-lacunas">Nenhuma pergunta sem resposta no período.</p>
+    <% } else { %>
+      <div class="tabela-rolavel">
+      <table class="lista-conversas lista-lacunas">
+        <thead><tr><th>Pergunta</th><th class="num">Vezes</th><th class="col-ultima">Última vez</th><th>Motivo</th><th class="sem-impressao">Ação</th></tr></thead>
+        <tbody>
+          <% lacunasNaTela.forEach((l) => { %>
+            <tr>
+              <td class="col-pergunta"><%= l.pergunta %></td>
+              <td class="num"><%= l.vezes %></td>
+              <td class="col-ultima ultima-atividade"><%= fmt.dataHora(l.ultima) %></td>
+              <td><% l.motivos.forEach((m) => { %><span class="badge badge-motivo badge-motivo-<%= m %>"><%= motivos[m] %></span> <% }) %></td>
+              <td class="sem-impressao"><a href="<%= l.href %>">Cadastrar na base</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      </div>
+      <% if (r.lacunas.length > lacunasNaTela.length) { %>
+        <p class="dica">Mostrando <%= lacunasNaTela.length %> de <%= r.lacunas.length %> perguntas. O CSV “sem resposta” traz todas.</p>
+      <% } %>
+    <% } %>
+  </section>
+
+  <script>
+    document.getElementById('imprimir').addEventListener('click', () => window.print());
+  </script>
+</body>
+</html>

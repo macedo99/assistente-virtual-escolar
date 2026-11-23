@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login — Dashboard</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="login-page">
+  <form class="login-box" method="POST" action="/login">
+    <h1>Dashboard de Atendimento</h1>
+    <% if (erro) { %><p class="erro"><%= erro %></p><% } %>
+    <label>E-mail</label>
+    <input type="email" name="email" autocomplete="username" required autofocus>
+    <label>Senha</label>
+    <input type="password" name="senha" autocomplete="current-password" required>
+    <button type="submit">Entrar</button>
+  </form>
+</body>
+</html>

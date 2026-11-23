@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= contagem.aguardando > 0 ? '(' + contagem.aguardando + ') ' : '' %>Conversas — Dashboard</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Conversas</h1>
+    <div class="header-user">
+      <% if (atendente.papel === 'admin') { %><a href="/metricas">Métricas</a><a href="/base">Base de conhecimento</a><% } %>
+      <span><%= atendente.nome %></span>
+      <form method="POST" action="/logout"><button class="link-button">Sair</button></form>
+    </div>
+  </header>
+
+  <% if (aviso) { %>
+    <div class="flash flash-<%= aviso.tipo %>" role="status"><%= aviso.texto %></div>
+  <% } %>
+
+  <div class="resumo">
+    <span class="resumo-item resumo-aguardando"><strong><%= contagem.aguardando %></strong> aguardando atendente</span>
+    <span class="resumo-item resumo-humano"><strong><%= contagem.humano %></strong> em atendimento humano</span>
+    <span class="resumo-item resumo-bot"><strong><%= contagem.bot %></strong> só com o bot</span>
+    <span class="atualizacao">Atualiza sozinha a cada 5 s · última atualização às <%= atualizadaEm %></span>
+  </div>
+
+  <div class="tabela-rolavel">
+  <table class="lista-conversas">
+    <thead>
+      <tr><th>Usuário</th><th class="col-papel">Papel</th><th>Status</th><th class="col-atendente">Atendente</th><th class="col-ultima">Última mensagem</th><th class="col-atividade">Última atividade</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% if (conversas.length === 0) { %>
+        <tr><td colspan="7" class="vazio">Nenhuma conversa ativa no momento.</td></tr>
+      <% } %>
+      <% conversas.forEach(c => { %>
+        <tr class="status-<%= c.status %>">
+          <td><%= c.usuario_nome %></td>
+          <td class="col-papel"><%= c.usuario_papel %></td>
+          <td><span class="badge"><%= c.status_rotulo %></span><% if (c.espera) { %> <small class="espera">há <%= c.espera %></small><% } %></td>
+          <td class="atendente-coluna col-atendente"><%= c.atendente_exibicao || '—' %></td>
+          <td class="ultima-mensagem col-ultima"><%= c.ultima_mensagem || '—' %></td>
+          <td class="ultima-atividade col-atividade"><%= c.ultima_em_fmt %></td>
+          <td><a href="/conversas/<%= c.id %>"><%= c.status === 'aguardando_atendente' ? 'Atender' : 'Abrir' %></a></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  </div>
+
+  <script>
+    // Recarrega a lista periodicamente pra refletir conversas/mensagens novas.
+    // Simples de propósito; dá pra trocar por WebSocket depois se precisar
+    // de atualização instantânea de verdade.
+    // Se acabou de chegar um recado ("Conversa encerrada..."), espera mais um pouco pra dar tempo de ler.
+    setTimeout(() => location.reload(), <%= aviso ? 10000 : 5000 %>);
+  </script>
+</body>
+</html>

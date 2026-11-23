@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Base de conhecimento — Dashboard</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Base de conhecimento</h1>
+    <div class="header-user">
+      <a href="/">← Conversas</a>
+      <a href="/metricas">Métricas</a>
+      <span><%= atendente.nome %></span>
+      <form method="POST" action="/logout"><button class="link-button">Sair</button></form>
+    </div>
+  </header>
+
+  <% if (aviso) { %>
+    <div class="flash flash-<%= aviso.tipo %>" role="status"><%= aviso.texto %></div>
+  <% } %>
+
+  <div class="resumo">
+    <span class="resumo-item resumo-indexado"><strong id="cont-indexado"><%= contagem.indexado %></strong> indexados</span>
+    <span class="resumo-item resumo-indexando"><strong id="cont-indexando"><%= contagem.indexando %></strong> indexando</span>
+    <span class="resumo-item resumo-problema"><strong id="cont-problema"><%= contagem.problema %></strong> com problema</span>
+    <a class="btn btn-primario" href="/base/novo">Novo item</a>
+    <span class="atualizacao">Status atualiza sozinho a cada 4 s · última atualização às <span id="atualizada-em"><%= atualizadaEm %></span></span>
+  </div>
+
+  <div class="tabela-rolavel">
+  <table class="lista-conversas lista-base">
+    <thead>
+      <tr><th>Título</th><th>Status</th><th class="col-trechos num">Trechos</th><th class="col-tamanho num">Tamanho</th><th class="col-atualizado">Atualizado</th><th>Ações</th></tr>
+    </thead>
+    <tbody id="itens">
+      <% if (itens.length === 0) { %>
+        <tr><td colspan="6" class="vazio">Nenhum item na base ainda. Clique em “Novo item” para cadastrar o primeiro.</td></tr>
+      <% } %>
+      <% itens.forEach(i => { %>
+        <tr data-id="<%= i.id %>" data-status="<%= i.status %>">
+          <td class="col-titulo"><a href="/base/<%= i.id %>/editar"><%= i.titulo %></a></td>
+          <td><span class="badge badge-<%= i.visual %>"><%= i.rotulo %></span><small class="espera"><%= i.detalhe %></small></td>
+          <td class="col-trechos num"><%= i.n_trechos %></td>
+          <td class="col-tamanho num"><%= i.tamanho %> car.</td>
+          <td class="col-atualizado ultima-atividade"><%= i.atualizado_em_fmt %></td>
+          <td>
+            <div class="acoes-linha">
+              <a href="/base/<%= i.id %>/editar">Editar</a>
+              <form method="POST" action="/base/<%= i.id %>/reindexar">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <button type="submit" class="link-acao" data-reindexar <%= i.pode_reindexar ? '' : 'disabled' %> title="<%= i.pode_reindexar ? 'Gerar os embeddings deste item de novo' : 'Já está sendo indexado: espere terminar' %>">Reindexar</button>
+              </form>
+              <form method="POST" action="/base/<%= i.id %>/excluir" data-confirmar="Excluir “<%= i.titulo %>”? O bot deixa de usar este conteúdo e os trechos dele são apagados.">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <button type="submit" class="link-acao perigo">Excluir</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  </div>
+
+  <script>
+    // Botões com data-confirmar pedem uma confirmação antes de enviar o formulário.
+    document.querySelectorAll('form[data-confirmar]').forEach((form) => {
+      form.addEventListener('submit', (e) => {
+        if (!window.confirm(form.dataset.confirmar)) e.preventDefault();
+      });
+    });
+
+    // Atualiza o status de cada item (Indexando… → Indexado) sem recarregar a página.
+    // Só textContent: títulos e textos vêm do banco e nunca devem ser interpretados como HTML.
+    const INTERVALO_MS = 4000;
+    const corpo = document.getElementById('itens');
+
+    function definirTexto(elemento, valor) {
+      if (elemento && elemento.textContent !== valor) elemento.textContent = valor;
+    }
+
+    function atualizarLinha(linha, item) {
+      const selo = linha.querySelector('.badge');
+      selo.className = `badge badge-${item.visual}`;
+      definirTexto(selo, item.rotulo);
+      definirTexto(linha.querySelector('.espera'), item.detalhe);
+      definirTexto(linha.querySelector('.col-trechos'), String(item.n_trechos));
+      definirTexto(linha.querySelector('.col-tamanho'), `${item.tamanho} car.`);
+      definirTexto(linha.querySelector('.col-atualizado'), item.atualizado_em_fmt);
+      linha.dataset.status = item.status;
+
+      const botao = linha.querySelector('button[data-reindexar]');
+      if (botao) {
+        botao.disabled = !item.pode_reindexar;
+        botao.title = item.pode_reindexar ? 'Gerar os embeddings deste item de novo' : 'Já está sendo indexado: espere terminar';
+      }
+    }
+
+    async function consultar() {
+      try {
+        const resp = await fetch('/api/base/status', { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+        if (resp.status === 401) { window.location.href = '/login'; return; } // sessão expirou
+        if (!resp.ok) return; // erro passageiro — tenta de novo no próximo ciclo
+        const dados = await resp.json();
+
+        // Item novo ou excluído (por outra pessoa, ou pelo n8n): recarrega para a lista refletir isso.
+        const naTela = Array.from(corpo.querySelectorAll('tr[data-id]')).map((tr) => tr.dataset.id).sort().join(',');
+        const noServidor = dados.itens.map((i) => i.id).sort().join(',');
+        if (naTela !== noServidor) { window.location.reload(); return; }
+
+        dados.itens.forEach((item) => {
+          const linha = corpo.querySelector(`tr[data-id="${item.id}"]`);
+          if (linha) atualizarLinha(linha, item);
+        });
+        definirTexto(document.getElementById('cont-indexado'), String(dados.contagem.indexado));
+        definirTexto(document.getElementById('cont-indexando'), String(dados.contagem.indexando));
+        definirTexto(document.getElementById('cont-problema'), String(dados.contagem.problema));
+        definirTexto(document.getElementById('atualizada-em'), dados.atualizada_em);
+      } catch (err) {
+        // sem rede por um instante: tenta de novo no próximo ciclo
+      }
+    }
+
+    setInterval(consultar, INTERVALO_MS);
+  </script>
+</body>
+</html>

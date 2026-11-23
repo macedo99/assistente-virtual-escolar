@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conversa — Dashboard</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>
+      <%= conversa.usuario_nome %> <small>(<%= conversa.usuario_papel %>)</small>
+      <span class="status-<%= conversa.status %>"><span class="badge"><%= conversa.status_rotulo %></span></span>
+    </h1>
+    <a href="/">← Voltar</a>
+  </header>
+
+  <% if (aviso) { %>
+    <div class="flash flash-<%= aviso.tipo %>" role="status"><%= aviso.texto %></div>
+  <% } %>
+  <div class="flash flash-aviso" id="aviso-estado" role="status" hidden>
+    O estado desta conversa mudou (alguém assumiu, devolveu ou encerrou). <a href="/conversas/<%= conversa.id %>">Atualizar a página</a>
+  </div>
+
+  <div class="barra-acoes">
+    <span class="quem-atende"><%= conversa.quem_atende %></span>
+    <% if (pode.assumir) { %>
+      <form method="POST" action="/conversas/<%= conversa.id %>/assumir">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button type="submit" class="btn btn-primario">Assumir atendimento</button>
+      </form>
+    <% } %>
+    <% if (pode.devolver) { %>
+      <form method="POST" action="/conversas/<%= conversa.id %>/devolver" data-confirmar="Devolver esta conversa ao bot? O bot volta a responder o usuário.">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button type="submit" class="btn">Devolver ao bot</button>
+      </form>
+    <% } %>
+    <% if (pode.encerrar) { %>
+      <form method="POST" action="/conversas/<%= conversa.id %>/encerrar" data-confirmar="Encerrar esta conversa? Se o usuário escrever de novo, começa uma conversa nova.">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button type="submit" class="btn btn-perigo">Encerrar conversa</button>
+      </form>
+    <% } %>
+  </div>
+
+  <p class="aviso-ao-vivo">Mensagens novas aparecem sozinhas (a tela consulta o servidor a cada 3 s).</p>
+
+  <div id="mensagens" data-conversa-id="<%= conversa.id %>" data-estado="<%= conversa.status %>:<%= conversa.atendente_id || '' %>">
+    <% mensagens.forEach(m => { %>
+      <div class="msg msg-<%= m.remetente %>" data-id="<%= m.id %>">
+        <span class="remetente"><%= m.remetente %></span><% if (m.atendente_nome) { %><span class="autor"><%= m.atendente_nome %></span><% } %><span class="hora"><%= m.hora %></span>
+        <p><%= m.conteudo %></p>
+        <% if (m.feedback) { %><span class="feedback"><%= m.feedback === 'positivo' ? '👍' : '👎' %></span><% } %>
+      </div>
+    <% }) %>
+  </div>
+
+  <% if (pode.responder) { %>
+    <div class="rodape-resposta">
+      <form id="form-resposta" class="form-resposta" method="POST" action="/api/conversas/<%= conversa.id %>/mensagens">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <textarea id="texto" name="texto" rows="2" maxlength="<%= limiteMensagem %>" placeholder="Escreva a resposta para <%= conversa.usuario_nome %>…" aria-label="Resposta ao usuário" required></textarea>
+        <div class="form-resposta-rodape">
+          <span class="dica">Enter envia · Shift+Enter pula de linha · o usuário vê "<%= atendente.nome %>:" antes do texto</span>
+          <button type="submit" class="btn btn-primario" id="btn-enviar">Enviar</button>
+        </div>
+        <p class="erro-envio" id="erro-envio" role="alert" hidden></p>
+      </form>
+    </div>
+  <% } %>
+
+  <script>
+    const container = document.getElementById('mensagens');
+    const conversaId = container.dataset.conversaId;
+    const estadoInicial = container.dataset.estado;
+    const avisoEstado = document.getElementById('aviso-estado');
+
+    // ids das mensagens que já estão na tela. O cursor do polling é o maior deles, e a lista evita
+    // duplicar uma mensagem caso duas consultas se sobreponham (ex.: o servidor demorou mais de 3s).
+    const vistos = new Set(Array.from(container.querySelectorAll('.msg')).map((el) => el.dataset.id));
+
+    function maiorId() {
+      let maior = 0;
+      vistos.forEach((id) => { if (Number(id) > maior) maior = Number(id); });
+      return maior;
+    }
+
+    function criarMensagem(m) {
+      // Elementos criados via DOM + textContent (nunca innerHTML com texto vindo do banco):
+      // mensagens do usuário ou geradas pelo LLM não são confiáveis, e innerHTML deixaria
+      // qualquer coisa parecida com HTML/script ser interpretada no navegador do atendente.
+      const div = document.createElement('div');
+      div.className = `msg msg-${m.remetente}`;
+      div.dataset.id = m.id;
+
+      const remetente = document.createElement('span');
+      remetente.className = 'remetente';
+      remetente.textContent = m.remetente;
+      div.appendChild(remetente);
+
+      if (m.atendente_nome) {
+        const autor = document.createElement('span');
+        autor.className = 'autor';
+        autor.textContent = m.atendente_nome;
+        div.appendChild(autor);
+      }
+
+      const hora = document.createElement('span');
+      hora.className = 'hora';
+      hora.textContent = m.hora || '';
+      div.appendChild(hora);
+
+      const texto = document.createElement('p');
+      texto.textContent = m.conteudo;
+      div.appendChild(texto);
+
+      if (m.feedback) {
+        const fb = document.createElement('span');
+        fb.className = 'feedback';
+        fb.textContent = m.feedback === 'positivo' ? '👍' : '👎';
+        div.appendChild(fb);
+      }
+      return div;
+    }
+
+    async function buscarNovas() {
+      try {
+        const resp = await fetch(`/api/conversas/${conversaId}/mensagens?desde=${maiorId()}`, { credentials: 'same-origin' });
+        if (resp.status === 401) { window.location.href = '/login'; return; } // sessão expirou
+        if (!resp.ok) return; // erro passageiro — tenta de novo no próximo ciclo
+
+        const dados = await resp.json();
+
+        // Alguém assumiu / devolveu / encerrou enquanto esta tela estava aberta: os botões daqui ficaram velhos.
+        if (dados.estado !== estadoInicial) avisoEstado.hidden = false;
+
+        let adicionou = false;
+        dados.mensagens.forEach((m) => {
+          const id = String(m.id);
+          if (vistos.has(id)) return;
+          vistos.add(id);
+          container.appendChild(criarMensagem(m));
+          adicionou = true;
+        });
+
+        if (adicionou) window.scrollTo(0, document.body.scrollHeight);
+      } catch (err) {
+        console.error('Falha ao buscar novas mensagens:', err);
+      }
+    }
+
+    // Botões com data-confirmar pedem uma confirmação antes de enviar o formulário.
+    document.querySelectorAll('form[data-confirmar]').forEach((form) => {
+      form.addEventListener('submit', (e) => {
+        if (!window.confirm(form.dataset.confirmar)) e.preventDefault();
+      });
+    });
+
+    // Envio da resposta do atendente (só existe na tela quando ele pode responder).
+    const formResposta = document.getElementById('form-resposta');
+    if (formResposta) {
+      const campo = document.getElementById('texto');
+      const botao = document.getElementById('btn-enviar');
+      const erro = document.getElementById('erro-envio');
+      let enviando = false;
+
+      const mostrarErro = (texto) => { erro.textContent = texto; erro.hidden = !texto; };
+
+      async function enviar() {
+        if (enviando) return; // evita enviar duas vezes com um clique duplo
+        const texto = campo.value.trim();
+        if (!texto) { mostrarErro('Escreva uma mensagem antes de enviar.'); return; }
+
+        enviando = true;
+        botao.disabled = true;
+        mostrarErro('');
+        try {
+          const resp = await fetch(formResposta.action, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ _csrf: formResposta.elements._csrf.value, texto }),
+          });
+          if (resp.status === 401) { window.location.href = '/login'; return; }
+
+          let dados = null;
+          try { dados = await resp.json(); } catch (e) { /* resposta que não é JSON */ }
+
+          if (!resp.ok || !dados || !dados.ok) {
+            // O texto fica no campo: o atendente pode corrigir/tentar de novo sem digitar tudo outra vez.
+            mostrarErro((dados && dados.erro) || 'Não foi possível enviar (erro inesperado do servidor).');
+            return;
+          }
+
+          campo.value = '';
+          if (dados.aviso) mostrarErro(dados.aviso);
+          await buscarNovas(); // mostra a mensagem enviada já, sem esperar o próximo ciclo
+        } catch (err) {
+          mostrarErro('Falha de rede ao enviar. Confira se o dashboard está no ar e tente de novo.');
+        } finally {
+          enviando = false;
+          botao.disabled = false;
+          campo.focus();
+        }
+      }
+
+      formResposta.addEventListener('submit', (e) => { e.preventDefault(); enviar(); });
+      campo.addEventListener('keydown', (e) => {
+        // Enter envia; Shift+Enter pula de linha. isComposing: não envia no meio de uma composição (acentos, IME).
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviar(); }
+      });
+    }
+
+    window.scrollTo(0, document.body.scrollHeight); // abre já na mensagem mais recente
+    setInterval(buscarNovas, 3000);
+  </script>
+</body>
+</html>
