@@ -1,5 +1,8 @@
 # Etapa 1: gera o CSS (Tailwind) — precisa das dependências de desenvolvimento, que não vão para a imagem final.
-FROM node:22-alpine AS estilos
+# Versão fixa do Node (mude de propósito, junto com um teste: npm test e scripts/testar-dashboard.js).
+ARG NODE_IMAGE=node:22.23.5-alpine
+
+FROM ${NODE_IMAGE} AS estilos
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -7,7 +10,7 @@ COPY src ./src
 RUN npm run build:css
 
 # Etapa 2: imagem final, só com as dependências de produção e o CSS já gerado.
-FROM node:22-alpine
+FROM ${NODE_IMAGE}
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev

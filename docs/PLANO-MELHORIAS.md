@@ -7,7 +7,7 @@ usuário vê e usa todo dia, depois o que fecha brechas de segurança, por fim o
 |---|---|---|---|
 | 1 | Dashboard: visual novo + importar PDF | Usabilidade; texto entrando na base sem revisão (para PDFs) | **Feita** |
 | 2 | Segurança do acesso | Papel decidido por palavra-chave; login sem limite de tentativas; `SESSION_SECRET` padrão; cookie sem `Secure` | **Feita** |
-| 3 | Builds reproduzíveis | Imagens em `:latest`; sem `package-lock.json` | Parcial (lockfile já existe) |
+| 3 | Builds reproduzíveis | Imagens em `:latest`; sem `package-lock.json` | **Feita** |
 | 4 | Testes automatizados e CI | Sem testes de unidade; nada roda sozinho em PR | Parcial (`npm test` criado) |
 | 5 | Qualidade do LLM / PLN | Sem testes de prompt injection; sem golden set; corte de trechos por caractere | A fazer |
 | 6 | PDFs avançados (opcional) | PDFs escaneados; documentos maiores que 50 mil caracteres | A fazer |
@@ -54,11 +54,14 @@ Como conferir: `docker compose up -d --build dashboard` e depois
 Para aplicar: gerar o `SESSION_SECRET` no `.env`, `docker compose up -d --build dashboard` e
 `docker compose exec dashboard node scripts/aplicar-migracao.js`.
 
-## Etapa 3 — Builds reproduzíveis
+## Etapa 3 — Builds reproduzíveis (feita)
 
-1. Fixar versões das imagens no `docker-compose.yml` (`n8n`, `ollama`, `ngrok`, `pgvector`).
-2. `npm ci` no Dockerfile com `package-lock.json` versionado (já feito no dashboard).
-3. Registrar no README como atualizar essas versões de propósito (e não por acaso, num restart).
+- Imagens com versão fixa no `docker-compose.yml` (`pgvector 0.8.7-pg17`, `n8n 2.49.5`, `ngrok 3.39.13-debian`,
+  `ollama 0.40.16`), cada uma ajustável pelo `.env` (`N8N_VERSION` etc.); Node fixo no Dockerfile (`22.23.5-alpine`).
+- `package-lock.json` versionado e `npm ci` no Dockerfile.
+- Teste `test/versoes.test.js`: falha se alguma imagem voltar para `:latest` ou se o Dockerfile usar `npm install`.
+- Como conferir a versão em uso e atualizar com segurança: `docs/ATUALIZAR-VERSOES.md`
+  (atenção: o n8n não pode voltar para uma versão mais antiga).
 
 ## Etapa 4 — Testes automatizados e CI
 
