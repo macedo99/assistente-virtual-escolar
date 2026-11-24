@@ -1,6 +1,6 @@
 <%
   // Barra de navegação de todas as telas logadas. Parâmetros: atendente, ativo ('conversas' | 'base' | 'metricas').
-  // Os links da base e das métricas só aparecem para administradores (o teste de fumaça confere isso).
+  // Os links da base, das métricas e dos usuários só aparecem para administradores (o teste de fumaça confere isso).
   const ehAdmin = atendente && atendente.papel === 'admin';
   const iniciais = String((atendente && atendente.nome) || '?').trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
   const classeLink = (nome) => 'inline-flex items-center gap-2 rounded-lg px-3 py-2 font-medium transition ' +
@@ -17,6 +17,7 @@
       <% if (ehAdmin) { %>
         <a href="/base" class="<%= classeLink('base') %>" <%- ativo === 'base' ? 'aria-current="page"' : '' %>><%- include('icone', { nome: 'livro' }) %><span class="sr-only md:not-sr-only">Base de conhecimento</span></a>
         <a href="/metricas" class="<%= classeLink('metricas') %>" <%- ativo === 'metricas' ? 'aria-current="page"' : '' %>><%- include('icone', { nome: 'grafico' }) %><span class="sr-only sm:not-sr-only">Métricas</span></a>
+        <a href="/usuarios" class="<%= classeLink('usuarios') %>" <%- ativo === 'usuarios' ? 'aria-current="page"' : '' %>><%- include('icone', { nome: 'usuarios' }) %><span class="sr-only sm:not-sr-only">Usuários</span></a>
       <% } %>
     </nav>
     <div class="ml-auto flex items-center gap-2">

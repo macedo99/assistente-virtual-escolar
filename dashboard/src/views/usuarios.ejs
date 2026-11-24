@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <%- include('partials/head', { titulo: 'Usuários do bot' }) %>
+</head>
+<body>
+  <%- include('partials/topo', { atendente, ativo: 'usuarios' }) %>
+
+  <main class="pagina">
+    <div class="mb-6">
+      <h1>Usuários do bot</h1>
+      <p class="mt-1 max-w-3xl text-sm text-slate-500">Quem conversa com o bot pelo Telegram. Todo cadastro novo entra como <strong>professor</strong>; só um administrador pode tornar alguém gestor.</p>
+    </div>
+
+    <%- include('partials/aviso', { aviso }) %>
+
+    <div class="mb-6 grid grid-cols-2 gap-3 sm:max-w-md sm:gap-4">
+      <div class="cartao p-3 sm:p-5"><p class="resumo-numero"><%= contagem.professor %></p><p class="text-xs text-slate-500 sm:text-sm">professores</p></div>
+      <div class="cartao p-3 sm:p-5"><p class="resumo-numero"><%= contagem.gestor %></p><p class="text-xs text-slate-500 sm:text-sm">gestores</p></div>
+    </div>
+
+    <div class="cartao overflow-hidden">
+      <% if (usuarios.length === 0) { %>
+        <p class="px-6 py-16 text-center text-sm text-slate-500">Ninguém se cadastrou pelo Telegram ainda.</p>
+      <% } else { %>
+        <div class="overflow-x-auto">
+          <table class="tabela">
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>Papel</th>
+                <th class="num hidden sm:table-cell">Conversas</th>
+                <th class="hidden md:table-cell">Última mensagem</th>
+                <th class="hidden lg:table-cell">Cadastro</th>
+                <th class="text-right"><span class="sr-only">Ação</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% usuarios.forEach((u) => { const novoPapel = u.papel === 'gestor' ? 'professor' : 'gestor'; %>
+                <tr>
+                  <td>
+                    <p class="font-medium text-slate-900"><%= u.nome_exibicao %></p>
+                    <% if (u.telegram_username) { %><p class="text-xs text-slate-500">@<%= u.telegram_username %></p><% } %>
+                  </td>
+                  <td><span class="badge <%= u.papel === 'gestor' ? 'badge-atendimento_humano' : '' %>"><%= u.papel_rotulo %></span></td>
+                  <td class="num hidden sm:table-cell"><%= u.n_conversas %></td>
+                  <td class="hidden whitespace-nowrap text-slate-500 md:table-cell"><%= u.ultima_mensagem_fmt %></td>
+                  <td class="hidden whitespace-nowrap text-slate-500 lg:table-cell"><%= u.criado_em_fmt %></td>
+                  <td class="text-right">
+                    <form method="POST" action="/usuarios/<%= u.id %>/papel"
+                      data-confirmar="<%= novoPapel === 'gestor' ? 'Tornar ' + u.nome_exibicao + ' gestor? Confirme que esta pessoa é mesmo da gestão da escola.' : 'Tornar ' + u.nome_exibicao + ' professor?' %>"
+                      data-confirmar-botao="<%= novoPapel === 'gestor' ? 'Tornar gestor' : 'Tornar professor' %>">
+                      <input type="hidden" name="_csrf" value="<%= csrf %>">
+                      <input type="hidden" name="papel" value="<%= novoPapel %>">
+                      <button type="submit" class="btn btn-pequeno"><%= novoPapel === 'gestor' ? 'Tornar gestor' : 'Tornar professor' %></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>

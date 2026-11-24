@@ -1,8 +1,10 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('../db');
+const { criarLimitesLogin } = require('../limites');
 
 const router = express.Router();
+const limites = criarLimitesLogin();
 
 const MSG_CREDENCIAIS_INVALIDAS = 'E-mail ou senha inválidos.';
 
@@ -11,7 +13,7 @@ router.get('/login', (req, res) => {
   res.render('login', { erro: null });
 });
 
-router.post('/login', async (req, res, next) => {
+router.post('/login', ...limites.middlewares, async (req, res, next) => {
   try {
     const { email, senha } = req.body;
 
@@ -40,8 +42,14 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).render('login', { erro: MSG_CREDENCIAIS_INVALIDAS });
     }
 
-    req.session.atendente = { id: atendente.id, nome: atendente.nome, papel: atendente.papel };
-    res.redirect('/');
+    limites.zerarEmail(req);
+    // Sessão nova a cada login: um id de sessão anterior (ex.: plantado por outra pessoa no computador
+    // compartilhado) não continua valendo depois que alguém entra.
+    req.session.regenerate((err) => {
+      if (err) return next(err);
+      req.session.atendente = { id: atendente.id, nome: atendente.nome, papel: atendente.papel };
+      res.redirect('/');
+    });
   } catch (err) {
     next(err);
   }

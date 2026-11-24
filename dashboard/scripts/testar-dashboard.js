@@ -64,6 +64,16 @@ const verificacoes = [
     exigir(r.texto.includes('Dashboard de Atendimento'), 'a página não tem o título "Dashboard de Atendimento"');
   }],
 
+  ['Cabeçalhos de segurança: CSP com nonce, sem iframe de outros sites, sem X-Powered-By', async () => {
+    const r = await pedir('GET', '/login');
+    const csp = r.headers.get('content-security-policy') || '';
+    exigir(/default-src 'self'/.test(csp), `CSP ausente ou sem default-src 'self': "${csp}"`);
+    exigir(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+'/.test(csp), 'a CSP deveria liberar só scripts do próprio site e com nonce');
+    exigir(/frame-ancestors 'none'/.test(csp), "a CSP deveria ter frame-ancestors 'none' (impede abrir o dashboard dentro de outro site)");
+    exigir(r.headers.get('x-content-type-options') === 'nosniff', 'falta X-Content-Type-Options: nosniff');
+    exigir(!r.headers.get('x-powered-by'), 'o servidor não deveria anunciar X-Powered-By');
+  }],
+
   ['Sem login, a lista (/) manda para /login', async () => {
     const r = await pedir('GET', '/');
     exigir(r.status === 302 && r.local === '/login', `esperava 302 → /login, veio ${r.status} → ${r.local}`);
@@ -250,7 +260,24 @@ const verificacoes = [
     exigir(cadastro.status === 200 && cadastro.texto.includes('value="Pergunta de teste"'), 'o link "Cadastrar na base" deveria pré-preencher o título');
   }],
 
-  ['Atendente comum NÃO acessa a base nem as métricas (403 na página, na API e no CSV) e não vê os links', async () => {
+  // ---------- Passo 9: usuários do bot (papel de gestor dado por administrador) ----------
+
+  ['Usuários do bot: sem login vai para /login; sem token (CSRF) a troca de papel é recusada', async () => {
+    const pagina = await pedir('GET', '/usuarios');
+    exigir(pagina.status === 302 && pagina.local === '/login', `/usuarios sem login: esperava 302 → /login, veio ${pagina.status} → ${pagina.local}`);
+    if (!estado.cookie) return PULA_SEM_LOGIN;
+    const semToken = await pedir('POST', '/usuarios/1/papel', { cookie: estado.cookie, form: { papel: 'gestor' } });
+    exigir(semToken.status === 403, `POST /usuarios/1/papel sem token: esperava 403, veio ${semToken.status}`);
+  }],
+
+  ['Administrador: a tela de usuários do bot abre', async () => {
+    if (!estado.cookie) return PULA_SEM_LOGIN;
+    if (!estado.admin) return 'pulado: o primeiro atendente informado não é administrador';
+    const pagina = await pedir('GET', '/usuarios', { cookie: estado.cookie });
+    exigir(pagina.status === 200 && pagina.texto.includes('<h1>Usuários do bot</h1>'), `/usuarios: esperava a tela de usuários (200), veio ${pagina.status}`);
+  }],
+
+  ['Atendente comum NÃO acessa a base, as métricas nem os usuários do bot (403) e não vê os links', async () => {
     if (!emailComum || !senhaComum) return 'pulado: passe o e-mail e a senha de um atendente comum (não admin) como 3º e 4º argumentos';
     const entrada = await pedir('POST', '/login', { form: { email: emailComum, senha: senhaComum } });
     exigir(entrada.status === 302 && entrada.local === '/', `login do atendente comum: esperava 302 → /, veio ${entrada.status}. Confira o e-mail/senha e se ele está ativo.`);
@@ -266,7 +293,8 @@ const verificacoes = [
     exigir(comoJson(api.texto, 'a resposta da API').erro, 'o JSON não tem o campo "erro"');
 
     exigir(!lista.texto.includes('href="/metricas"'), 'o atendente informado vê o link das métricas: ele é administrador? Use um atendente comum.');
-    for (const caminho of ['/metricas', '/metricas/exportar.csv?tipo=resumo']) {
+    exigir(!lista.texto.includes('href="/usuarios"'), 'o atendente informado vê o link dos usuários do bot: ele é administrador? Use um atendente comum.');
+    for (const caminho of ['/metricas', '/metricas/exportar.csv?tipo=resumo', '/usuarios']) {
       const r = await pedir('GET', caminho, { cookie });
       exigir(r.status === 403, `${caminho} como atendente comum: esperava 403, veio ${r.status}`);
     }

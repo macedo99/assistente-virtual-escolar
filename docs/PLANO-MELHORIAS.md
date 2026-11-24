@@ -6,7 +6,7 @@ usuário vê e usa todo dia, depois o que fecha brechas de segurança, por fim o
 | Etapa | Tema | Lacunas da análise que fecha | Situação |
 |---|---|---|---|
 | 1 | Dashboard: visual novo + importar PDF | Usabilidade; texto entrando na base sem revisão (para PDFs) | **Feita** |
-| 2 | Segurança do acesso | Papel decidido por palavra-chave; login sem limite de tentativas; `SESSION_SECRET` padrão; cookie sem `Secure` | A fazer |
+| 2 | Segurança do acesso | Papel decidido por palavra-chave; login sem limite de tentativas; `SESSION_SECRET` padrão; cookie sem `Secure` | **Feita** |
 | 3 | Builds reproduzíveis | Imagens em `:latest`; sem `package-lock.json` | Parcial (lockfile já existe) |
 | 4 | Testes automatizados e CI | Sem testes de unidade; nada roda sozinho em PR | Parcial (`npm test` criado) |
 | 5 | Qualidade do LLM / PLN | Sem testes de prompt injection; sem golden set; corte de trechos por caractere | A fazer |
@@ -32,18 +32,27 @@ usuário vê e usa todo dia, depois o que fecha brechas de segurança, por fim o
 Como conferir: `docker compose up -d --build dashboard` e depois
 `docker compose exec dashboard node scripts/testar-dashboard.js "admin@..." "senha" "atendente@..." "senha"`.
 
-## Etapa 2 — Segurança do acesso
+## Etapa 2 — Segurança do acesso (feita)
 
-1. **Papel do usuário** (achado de severidade alta): no n8n, todo usuário novo entra como `professor`; criar no
-   dashboard uma tela **Usuários do bot** em que um administrador promove alguém a `gestor`.
-   Atualizar o nó “Inserir usuário” e o `queries_n8n.sql`.
-2. **Limite de tentativas de login** (`express-rate-limit`): por exemplo, 10 tentativas por 15 minutos por IP
-   e por e-mail, com a mesma mensagem genérica de hoje.
-3. **`SESSION_SECRET` obrigatório**: o servidor não sobe sem ele (hoje só avisa e usa um valor padrão).
-4. **Cookie `Secure` e `trust proxy`** quando o dashboard for publicado atrás de HTTPS (variável de ambiente,
-   para continuar funcionando em `localhost`).
-5. **Cabeçalhos de segurança** (CSP, `X-Frame-Options`, `Referrer-Policy`) com `helmet`.
-6. Ampliar `scripts/testar-dashboard.js`: bloqueio após muitas tentativas de login; PDF falso recusado.
+- **Papel do usuário**: todo cadastro novo pelo Telegram entra como `professor`; o papel de gestor é dado por
+  um administrador na nova tela **Usuários** (`/usuarios`). O banco garante a regra com um gatilho
+  (`migracoes/002_papel_professor.sql`), mesmo que o n8n ainda mande “gestor”.
+  - **Ação manual no n8n**: no nó “Inserir usuário”, troque o 4º parâmetro por `{{ 'professor' }}`
+    (já atualizado em `queries_n8n.sql`). Se a mensagem de boas-vindas do bot diz “cadastrado como gestor”,
+    ajuste o texto também.
+  - Usuários que já eram gestores **não foram alterados**: revise-os na tela Usuários.
+- **Limite de tentativas de login** (`src/limites.js`): 8 senhas erradas por e-mail ou 30 por IP em 15 minutos
+  bloqueiam novas tentativas (429). Login certo zera a contagem daquele e-mail. A sessão é renovada a cada login.
+- **`SESSION_SECRET` obrigatório** (`src/seguranca.js`): o dashboard não sobe sem ele, com o valor de exemplo ou
+  com menos de 32 caracteres. Gere com `openssl rand -hex 32`.
+- **`COOKIE_SECURE`** (cookie só por HTTPS + HSTS) e **`TRUST_PROXY`** (IP real atrás de proxy) no `.env`;
+  ambos desligados por padrão, para funcionar em `http://localhost`.
+- **Cabeçalhos de segurança** (`helmet`): CSP com nonce por resposta (só scripts do próprio dashboard rodam),
+  `frame-ancestors 'none'`, `nosniff`, sem `X-Powered-By`.
+- Testes: `npm test` (limites e configuração) e 3 verificações novas no `scripts/testar-dashboard.js`.
+
+Para aplicar: gerar o `SESSION_SECRET` no `.env`, `docker compose up -d --build dashboard` e
+`docker compose exec dashboard node scripts/aplicar-migracao.js`.
 
 ## Etapa 3 — Builds reproduzíveis
 

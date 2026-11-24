@@ -4,12 +4,31 @@ const path = require('path');
 
 const pool = require('./db');
 const { prepararToken } = require('./csrf');
+const seguranca = require('./seguranca');
 const authRoutes = require('./routes/auth');
 const conversasRoutes = require('./routes/conversas');
 const baseRoutes = require('./routes/base');
 const metricasRoutes = require('./routes/metricas');
+const usuariosRoutes = require('./routes/usuarios');
+
+// Confere a configuração antes de tudo: sem um SESSION_SECRET forte, o dashboard NÃO sobe.
+let config;
+try {
+  config = seguranca.lerConfiguracao();
+} catch (err) {
+  if (!(err instanceof seguranca.ErroConfiguracao)) throw err;
+  console.error(`\nO dashboard não pode iniciar: ${err.message}\n`);
+  process.exit(1);
+}
 
 const app = express();
+app.disable('x-powered-by');
+// Atrás de um proxy (TRUST_PROXY), o IP real do usuário vem do cabeçalho X-Forwarded-For — o limite de
+// tentativas de login depende disso. Sem proxy, fica desligado (confiar no cabeçalho permitiria forjá-lo).
+app.set('trust proxy', config.trustProxy);
+
+app.use(seguranca.gerarNonce);
+app.use(seguranca.cabecalhos({ https: config.cookieSeguro }));
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -27,18 +46,15 @@ app.use((req, res, next) => {
   next();
 });
 
-if (!process.env.SESSION_SECRET) {
-  console.warn('AVISO: SESSION_SECRET não está definido (confira o .env). Usando uma chave padrão, que NÃO é segura.');
-}
-
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'troque-isto-em-producao',
+  secret: config.segredoSessao,
   resave: false,
   saveUninitialized: false,
   cookie: {
     maxAge: 8 * 60 * 60 * 1000, // 8 horas
     httpOnly: true,             // o JavaScript da página não lê o cookie (limita o estrago de um XSS)
     sameSite: 'lax',            // o navegador não manda o cookie em POSTs vindos de outros sites (CSRF)
+    secure: config.cookieSeguro, // COOKIE_SECURE=true: o cookie só trafega por HTTPS
   },
 }));
 
@@ -78,8 +94,9 @@ async function exigirLogin(req, res, next) {
 }
 
 app.use('/', authRoutes);
-// exigirLogin roda uma vez só; depois as rotas das conversas, as da base e as das métricas (estas duas só para administradores).
-app.use('/', exigirLogin, conversasRoutes, baseRoutes, metricasRoutes);
+// exigirLogin roda uma vez só; depois as rotas das conversas, da base, das métricas e dos usuários do bot
+// (estas três só para administradores).
+app.use('/', exigirLogin, conversasRoutes, baseRoutes, metricasRoutes, usuariosRoutes);
 
 // Handler de erro genérico — sem isso, uma exceção numa rota vira uma conexão pendurada
 // sem explicação nenhuma no navegador.

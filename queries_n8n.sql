@@ -12,13 +12,15 @@ LIMIT 1;
 
 -- ===================================================================
 -- Nó "Inserir usuário"  (branch "outro", quando o texto é professor/gestor)
+-- Todo usuário novo entra como "professor": o papel de gestor é dado por um administrador na tela
+-- "Usuários" do dashboard. (O banco também garante isso: migracoes/002_papel_professor.sql.)
 -- ===================================================================
 INSERT INTO usuarios (telegram_chat_id, telegram_username, nome, papel)
 VALUES ($1, $2, $3, $4)
 RETURNING id AS usuario_id;
 
 -- Query Parameters:
--- {{ $('Telegram Trigger').item.json.message.chat.id }}, {{ $('Telegram Trigger').item.json.message.chat.username }}, {{ $('Telegram Trigger').item.json.message.chat.first_name }}, {{ $('Telegram Trigger').item.json.message.text.toLowerCase().includes('gestor') ? 'gestor' : 'professor' }}
+-- {{ $('Telegram Trigger').item.json.message.chat.id }}, {{ $('Telegram Trigger').item.json.message.chat.username }}, {{ $('Telegram Trigger').item.json.message.chat.first_name }}, {{ 'professor' }}
 
 
 -- ===================================================================
