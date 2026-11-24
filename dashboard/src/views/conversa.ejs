@@ -1,75 +1,79 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Conversa — Dashboard</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/style.css">
+  <%- include('partials/head', { titulo: 'Conversa com ' + conversa.usuario_nome }) %>
 </head>
-<body>
-  <header>
-    <h1>
-      <%= conversa.usuario_nome %> <small>(<%= conversa.usuario_papel %>)</small>
-      <span class="status-<%= conversa.status %>"><span class="badge"><%= conversa.status_rotulo %></span></span>
-    </h1>
-    <a href="/">← Voltar</a>
-  </header>
+<body class="flex min-h-screen flex-col">
+  <%- include('partials/topo', { atendente, ativo: 'conversas' }) %>
 
-  <% if (aviso) { %>
-    <div class="flash flash-<%= aviso.tipo %>" role="status"><%= aviso.texto %></div>
-  <% } %>
-  <div class="flash flash-aviso" id="aviso-estado" role="status" hidden>
-    O estado desta conversa mudou (alguém assumiu, devolveu ou encerrou). <a href="/conversas/<%= conversa.id %>">Atualizar a página</a>
-  </div>
+  <main class="pagina flex w-full max-w-4xl flex-1 flex-col">
+    <a href="/" class="mb-4 inline-flex w-fit items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800"><%- include('partials/icone', { nome: 'voltar' }) %> Conversas</a>
 
-  <div class="barra-acoes">
-    <span class="quem-atende"><%= conversa.quem_atende %></span>
-    <% if (pode.assumir) { %>
-      <form method="POST" action="/conversas/<%= conversa.id %>/assumir">
-        <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <button type="submit" class="btn btn-primario">Assumir atendimento</button>
-      </form>
-    <% } %>
-    <% if (pode.devolver) { %>
-      <form method="POST" action="/conversas/<%= conversa.id %>/devolver" data-confirmar="Devolver esta conversa ao bot? O bot volta a responder o usuário.">
-        <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <button type="submit" class="btn">Devolver ao bot</button>
-      </form>
-    <% } %>
-    <% if (pode.encerrar) { %>
-      <form method="POST" action="/conversas/<%= conversa.id %>/encerrar" data-confirmar="Encerrar esta conversa? Se o usuário escrever de novo, começa uma conversa nova.">
-        <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <button type="submit" class="btn btn-perigo">Encerrar conversa</button>
-      </form>
-    <% } %>
-  </div>
-
-  <p class="aviso-ao-vivo">Mensagens novas aparecem sozinhas (a tela consulta o servidor a cada 3 s).</p>
-
-  <div id="mensagens" data-conversa-id="<%= conversa.id %>" data-estado="<%= conversa.status %>:<%= conversa.atendente_id || '' %>">
-    <% mensagens.forEach(m => { %>
-      <div class="msg msg-<%= m.remetente %>" data-id="<%= m.id %>">
-        <span class="remetente"><%= m.remetente %></span><% if (m.atendente_nome) { %><span class="autor"><%= m.atendente_nome %></span><% } %><span class="hora"><%= m.hora %></span>
-        <p><%= m.conteudo %></p>
-        <% if (m.feedback) { %><span class="feedback"><%= m.feedback === 'positivo' ? '👍' : '👎' %></span><% } %>
+    <div class="mb-6 flex flex-wrap items-center gap-3">
+      <span class="grid size-11 place-items-center rounded-full bg-indigo-100 text-base font-semibold text-indigo-700"><%= String(conversa.usuario_nome || '?').trim().charAt(0).toUpperCase() %></span>
+      <div class="min-w-0">
+        <h1 class="truncate"><%= conversa.usuario_nome %></h1>
+        <p class="text-sm capitalize text-slate-500"><%= conversa.usuario_papel %></p>
       </div>
-    <% }) %>
-  </div>
-
-  <% if (pode.responder) { %>
-    <div class="rodape-resposta">
-      <form id="form-resposta" class="form-resposta" method="POST" action="/api/conversas/<%= conversa.id %>/mensagens">
-        <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <textarea id="texto" name="texto" rows="2" maxlength="<%= limiteMensagem %>" placeholder="Escreva a resposta para <%= conversa.usuario_nome %>…" aria-label="Resposta ao usuário" required></textarea>
-        <div class="form-resposta-rodape">
-          <span class="dica">Enter envia · Shift+Enter pula de linha · o usuário vê "<%= atendente.nome %>:" antes do texto</span>
-          <button type="submit" class="btn btn-primario" id="btn-enviar">Enviar</button>
-        </div>
-        <p class="erro-envio" id="erro-envio" role="alert" hidden></p>
-      </form>
+      <span class="badge badge-<%= conversa.status %> ml-auto"><%= conversa.status_rotulo %></span>
     </div>
-  <% } %>
+
+    <%- include('partials/aviso', { aviso }) %>
+    <div class="flash flash-aviso mb-6" id="aviso-estado" role="status" hidden>
+      <%- include('partials/icone', { nome: 'atualizar', classe: 'size-5' }) %>
+      <p>O estado desta conversa mudou (alguém assumiu, devolveu ou encerrou). <a href="/conversas/<%= conversa.id %>">Atualizar a página</a></p>
+    </div>
+
+    <div class="cartao mb-4 flex flex-wrap items-center gap-3 p-4">
+      <p class="mr-auto text-sm text-slate-600"><%= conversa.quem_atende %></p>
+      <% if (pode.assumir) { %>
+        <form method="POST" action="/conversas/<%= conversa.id %>/assumir">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button type="submit" class="btn btn-primario"><%- include('partials/icone', { nome: 'usuarios' }) %> Assumir atendimento</button>
+        </form>
+      <% } %>
+      <% if (pode.devolver) { %>
+        <form method="POST" action="/conversas/<%= conversa.id %>/devolver" data-confirmar="Devolver esta conversa ao bot? O bot volta a responder o usuário." data-confirmar-botao="Devolver ao bot">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button type="submit" class="btn"><%- include('partials/icone', { nome: 'robo' }) %> Devolver ao bot</button>
+        </form>
+      <% } %>
+      <% if (pode.encerrar) { %>
+        <form method="POST" action="/conversas/<%= conversa.id %>/encerrar" data-confirmar="Encerrar esta conversa? Se o usuário escrever de novo, começa uma conversa nova." data-confirmar-botao="Encerrar conversa" data-confirmar-perigo="1">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button type="submit" class="btn btn-perigo"><%- include('partials/icone', { nome: 'fechar' }) %> Encerrar</button>
+        </form>
+      <% } %>
+    </div>
+
+    <div class="cartao flex flex-1 flex-col overflow-hidden">
+      <p class="border-b border-slate-100 px-5 py-2.5 text-center text-xs text-slate-400">Mensagens novas aparecem sozinhas (a tela consulta o servidor a cada 3 s).</p>
+
+      <div id="mensagens" class="flex flex-1 flex-col gap-3 bg-slate-50/60 px-4 py-5 sm:px-6" data-conversa-id="<%= conversa.id %>" data-estado="<%= conversa.status %>:<%= conversa.atendente_id || '' %>">
+        <% mensagens.forEach(m => { %>
+          <div class="msg msg-<%= m.remetente %>" data-id="<%= m.id %>">
+            <span class="remetente"><%= m.remetente %></span><% if (m.atendente_nome) { %><span class="autor"><%= m.atendente_nome %></span><% } %><span class="hora"><%= m.hora %></span>
+            <p><%= m.conteudo %></p>
+            <% if (m.feedback) { %><span class="feedback"><%= m.feedback === 'positivo' ? '👍' : '👎' %></span><% } %>
+          </div>
+        <% }) %>
+      </div>
+
+      <% if (pode.responder) { %>
+        <div class="sticky bottom-0 border-t border-slate-200 bg-white p-4">
+          <form id="form-resposta" class="flex flex-col gap-2" method="POST" action="/api/conversas/<%= conversa.id %>/mensagens">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <div class="flex items-end gap-2">
+              <textarea id="texto" name="texto" rows="2" maxlength="<%= limiteMensagem %>" class="campo max-h-56 min-h-12 resize-y" placeholder="Escreva a resposta para <%= conversa.usuario_nome %>…" aria-label="Resposta ao usuário" required></textarea>
+              <button type="submit" class="btn btn-primario h-11" id="btn-enviar"><%- include('partials/icone', { nome: 'enviar' }) %><span class="hidden sm:inline">Enviar</span></button>
+            </div>
+            <p class="dica">Enter envia · Shift+Enter pula de linha · o usuário vê "<%= atendente.nome %>:" antes do texto</p>
+            <p class="erro-campo" id="erro-envio" role="alert" hidden></p>
+          </form>
+        </div>
+      <% } %>
+    </div>
+  </main>
 
   <script>
     const container = document.getElementById('mensagens');
@@ -150,13 +154,6 @@
         console.error('Falha ao buscar novas mensagens:', err);
       }
     }
-
-    // Botões com data-confirmar pedem uma confirmação antes de enviar o formulário.
-    document.querySelectorAll('form[data-confirmar]').forEach((form) => {
-      form.addEventListener('submit', (e) => {
-        if (!window.confirm(form.dataset.confirmar)) e.preventDefault();
-      });
-    });
 
     // Envio da resposta do atendente (só existe na tela quando ele pode responder).
     const formResposta = document.getElementById('form-resposta');

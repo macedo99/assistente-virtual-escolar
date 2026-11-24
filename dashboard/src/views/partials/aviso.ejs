@@ -1,0 +1,10 @@
+<%
+  // Recado de uma ação (ok / aviso / erro). Parâmetro: aviso = { tipo, texto } ou null.
+  const icones = { ok: 'check', aviso: 'alerta', erro: 'alerta', info: 'info' };
+%><% if (aviso) { %>
+  <div class="flash flash-<%= aviso.tipo %> mb-6 print:hidden" role="<%= aviso.tipo === 'erro' ? 'alert' : 'status' %>" data-recado>
+    <%- include('icone', { nome: icones[aviso.tipo] || 'info', classe: 'size-5 mt-px' }) %>
+    <p class="flex-1"><%= aviso.texto %></p>
+    <button type="button" class="-m-1 rounded p-1 opacity-60 hover:opacity-100" data-fechar-recado aria-label="Fechar recado"><%- include('icone', { nome: 'fechar' }) %></button>
+  </div>
+<% } %>

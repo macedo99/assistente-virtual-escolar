@@ -1,0 +1,3 @@
+node_modules/
+# gerado por "npm run build:css" (e pelo Dockerfile)
+src/public/app.css

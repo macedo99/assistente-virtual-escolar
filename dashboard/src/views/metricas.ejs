@@ -1,138 +1,137 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Métricas — Dashboard</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/style.css">
+  <%- include('partials/head', { titulo: 'Métricas' }) %>
 </head>
 <body>
-  <header class="sem-impressao">
-    <h1>Métricas</h1>
-    <div class="header-user">
-      <a href="/">← Conversas</a>
-      <a href="/base">Base de conhecimento</a>
-      <span><%= atendente.nome %></span>
-      <form method="POST" action="/logout"><button class="link-button">Sair</button></form>
+  <%- include('partials/topo', { atendente, ativo: 'metricas' }) %>
+
+  <main class="pagina">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-3 print:hidden">
+      <div>
+        <h1>Métricas</h1>
+        <p class="mt-1 text-sm text-slate-500">Volume, satisfação e atendimento humano no período escolhido.</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a class="btn btn-pequeno" href="/metricas/exportar.csv?tipo=resumo&amp;de=<%= periodo.de %>&amp;ate=<%= periodo.ate %>"><%- include('partials/icone', { nome: 'download', classe: 'size-3.5' }) %> CSV: resumo</a>
+        <a class="btn btn-pequeno" href="/metricas/exportar.csv?tipo=conversas&amp;de=<%= periodo.de %>&amp;ate=<%= periodo.ate %>"><%- include('partials/icone', { nome: 'download', classe: 'size-3.5' }) %> CSV: conversas</a>
+        <a class="btn btn-pequeno" href="/metricas/exportar.csv?tipo=lacunas&amp;de=<%= periodo.de %>&amp;ate=<%= periodo.ate %>"><%- include('partials/icone', { nome: 'download', classe: 'size-3.5' }) %> CSV: sem resposta</a>
+        <button type="button" class="btn btn-pequeno" id="imprimir"><%- include('partials/icone', { nome: 'impressora', classe: 'size-3.5' }) %> Imprimir / PDF</button>
+      </div>
     </div>
-  </header>
 
-  <% if (aviso) { %>
-    <div class="flash flash-<%= aviso.tipo %> sem-impressao" role="status"><%= aviso.texto %></div>
-  <% } %>
+    <%- include('partials/aviso', { aviso }) %>
 
-  <form class="filtro-periodo sem-impressao" method="GET" action="/metricas">
-    <div class="atalhos">
-      <% atalhos.forEach((a) => { %>
-        <a class="atalho<%= (a.de === periodo.de && a.ate === periodo.ate) ? ' atalho-ativo' : '' %>" href="/metricas?de=<%= a.de %>&amp;ate=<%= a.ate %>"><%= a.rotulo %></a>
+    <form class="cartao mb-4 flex flex-wrap items-center gap-3 p-4 print:hidden" method="GET" action="/metricas">
+      <div class="flex flex-wrap gap-1.5">
+        <% atalhos.forEach((a) => { const ativo = a.de === periodo.de && a.ate === periodo.ate; %>
+          <a class="rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition <%= ativo ? 'bg-indigo-600 text-white ring-indigo-600' : 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50' %>" href="/metricas?de=<%= a.de %>&amp;ate=<%= a.ate %>"><%= a.rotulo %></a>
+        <% }) %>
+      </div>
+      <div class="ml-auto flex flex-wrap items-center gap-2 text-sm text-slate-600">
+        <label class="flex items-center gap-2">De <input class="campo w-auto py-1.5" type="date" name="de" value="<%= periodo.de %>" required></label>
+        <label class="flex items-center gap-2">até <input class="campo w-auto py-1.5" type="date" name="ate" value="<%= periodo.ate %>" required></label>
+        <button type="submit" class="btn btn-pequeno btn-primario">Aplicar</button>
+      </div>
+    </form>
+
+    <h2 class="mb-2 hidden text-xl font-semibold print:block">Métricas do atendimento</h2>
+    <p class="mb-6 text-sm text-slate-500">
+      Período: <strong class="text-slate-700"><%= fmt.dataBR(periodo.de) %> a <%= fmt.dataBR(periodo.ate) %></strong>
+      (<%= r.periodo.dias %> <%= r.periodo.dias === 1 ? 'dia' : 'dias' %>, horário de São Paulo) · gerado em <%= geradoEm %>
+    </p>
+
+    <%
+      const cartoes = [
+        { titulo: 'Volume', icone: 'chat', cor: 'bg-indigo-50 text-indigo-600', numero: fmt.num(r.volume.conversas_ativas), legenda: 'conversas ativas', linhas: [
+          ['Mensagens do usuário', fmt.num(r.volume.mensagens_usuario)],
+          ['Respostas do bot', fmt.num(r.volume.respostas_bot)],
+          ['Usuários ativos', fmt.num(r.volume.usuarios_ativos)],
+          ['Conversas novas', fmt.num(r.volume.conversas_novas)],
+          ['Usuários novos', fmt.num(r.volume.usuarios_novos)],
+        ] },
+        { titulo: 'Satisfação', icone: 'check', cor: 'bg-emerald-50 text-emerald-600', numero: fmt.pct(r.satisfacao.percentual), legenda: 'de 👍', linhas: [
+          ['👍 positivas', fmt.num(r.satisfacao.positivas)],
+          ['👎 negativas', fmt.num(r.satisfacao.negativas)],
+          ['Respostas avaliadas', fmt.num(r.satisfacao.avaliadas) + ' de ' + fmt.num(r.satisfacao.respostas_avaliaveis)],
+          ['Taxa de avaliação', fmt.pct(r.satisfacao.taxa_avaliacao)],
+        ] },
+        { titulo: 'Atendimento humano', icone: 'usuarios', cor: 'bg-sky-50 text-sky-600', numero: fmt.pct(r.atendimento.taxa_resolucao_bot), legenda: 'resolvidas pelo bot', linhas: [
+          ['Taxa de handoff', fmt.pct(r.atendimento.taxa_handoff) + ' (' + r.atendimento.conversas_com_pedido + ' de ' + r.atendimento.conversas + ')'],
+          ['Pedidos de atendente', fmt.num(r.atendimento.pedidos)],
+          ['Pedidos atendidos', fmt.num(r.atendimento.pedidos_atendidos)],
+          ['Pedidos sem atendimento (voltaram ao bot)', fmt.num(r.atendimento.pedidos_abandonados)],
+          ['Pedidos ainda na fila', fmt.num(r.atendimento.pedidos_na_fila)],
+        ] },
+        { titulo: 'Fila e atendimento', icone: 'relogio', cor: 'bg-amber-50 text-amber-600', numero: fmt.num(r.fila.esperando_agora), legenda: 'esperando agora', linhas: [
+          ...(r.fila.mais_antiga_s !== null ? [['Espera mais longa agora', fmt.duracao(r.fila.mais_antiga_s)]] : []),
+          ['Em atendimento agora', fmt.num(r.fila.em_atendimento_agora)],
+          ['Espera na fila (mediana)', fmt.duracao(r.fila.espera.mediana_s)],
+          ['Duração do atendimento (mediana)', fmt.duracao(r.duracao.mediana_s)],
+          ['Pedidos atendidos (base da espera)', fmt.num(r.fila.espera.n)],
+          ['Atendimentos concluídos (base da duração)', fmt.num(r.duracao.n)],
+          ['Atendimentos em andamento', fmt.num(r.duracao.em_andamento)],
+        ] },
+      ];
+    %>
+    <div class="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4 print:grid-cols-2">
+      <% cartoes.forEach((c) => { %>
+        <section class="cartao p-5">
+          <div class="flex items-center gap-3">
+            <span class="grid size-9 place-items-center rounded-lg <%= c.cor %>"><%- include('partials/icone', { nome: c.icone }) %></span>
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500"><%= c.titulo %></h2>
+          </div>
+          <p class="mt-4 flex items-baseline gap-2"><span class="resumo-numero"><%= c.numero %></span><span class="text-sm text-slate-500"><%= c.legenda %></span></p>
+          <dl class="mt-4 divide-y divide-slate-100 text-sm">
+            <% c.linhas.forEach(([rotulo, valor]) => { %>
+              <div class="flex justify-between gap-4 py-1.5"><dt class="text-slate-500"><%= rotulo %></dt><dd class="whitespace-nowrap text-right font-medium tabular-nums text-slate-800"><%= valor %></dd></div>
+            <% }) %>
+          </dl>
+        </section>
       <% }) %>
     </div>
-    <label>De <input type="date" name="de" value="<%= periodo.de %>" required></label>
-    <label>até <input type="date" name="ate" value="<%= periodo.ate %>" required></label>
-    <button type="submit" class="btn">Aplicar</button>
-    <span class="filtro-acoes">
-      <a class="btn" href="/metricas/exportar.csv?tipo=resumo&amp;de=<%= periodo.de %>&amp;ate=<%= periodo.ate %>">CSV: resumo</a>
-      <a class="btn" href="/metricas/exportar.csv?tipo=conversas&amp;de=<%= periodo.de %>&amp;ate=<%= periodo.ate %>">CSV: conversas</a>
-      <a class="btn" href="/metricas/exportar.csv?tipo=lacunas&amp;de=<%= periodo.de %>&amp;ate=<%= periodo.ate %>">CSV: sem resposta</a>
-      <button type="button" class="btn" id="imprimir">Imprimir / PDF</button>
-    </span>
-  </form>
 
-  <h2 class="so-impressao">Métricas do atendimento</h2>
-  <p class="periodo-info">
-    Período: <strong><%= fmt.dataBR(periodo.de) %> a <%= fmt.dataBR(periodo.ate) %></strong>
-    (<%= r.periodo.dias %> <%= r.periodo.dias === 1 ? 'dia' : 'dias' %>, horário de São Paulo) · gerado em <%= geradoEm %>
-  </p>
+    <div class="mb-6 grid gap-4 lg:grid-cols-2 print:grid-cols-2">
+      <figure class="cartao p-5">
+        <figcaption class="mb-3 text-sm font-semibold text-slate-700">Conversas ativas por dia</figcaption>
+        <%- graficoConversas %>
+      </figure>
+      <figure class="cartao p-5">
+        <figcaption class="mb-3 text-sm font-semibold text-slate-700">Mensagens do usuário por dia</figcaption>
+        <%- graficoMensagens %>
+      </figure>
+    </div>
 
-  <main class="metricas">
-    <section class="cartao">
-      <h2>Volume</h2>
-      <p class="numero-grande"><%= fmt.num(r.volume.conversas_ativas) %> <small>conversas ativas</small></p>
-      <dl class="detalhes">
-        <div><dt>Mensagens do usuário</dt><dd><%= fmt.num(r.volume.mensagens_usuario) %></dd></div>
-        <div><dt>Respostas do bot</dt><dd><%= fmt.num(r.volume.respostas_bot) %></dd></div>
-        <div><dt>Usuários ativos</dt><dd><%= fmt.num(r.volume.usuarios_ativos) %></dd></div>
-        <div><dt>Conversas novas</dt><dd><%= fmt.num(r.volume.conversas_novas) %></dd></div>
-        <div><dt>Usuários novos</dt><dd><%= fmt.num(r.volume.usuarios_novos) %></dd></div>
-      </dl>
-    </section>
-
-    <section class="cartao">
-      <h2>Satisfação</h2>
-      <p class="numero-grande"><%= fmt.pct(r.satisfacao.percentual) %> <small>de 👍</small></p>
-      <dl class="detalhes">
-        <div><dt>👍 positivas</dt><dd><%= fmt.num(r.satisfacao.positivas) %></dd></div>
-        <div><dt>👎 negativas</dt><dd><%= fmt.num(r.satisfacao.negativas) %></dd></div>
-        <div><dt>Respostas avaliadas</dt><dd><%= fmt.num(r.satisfacao.avaliadas) %> de <%= fmt.num(r.satisfacao.respostas_avaliaveis) %></dd></div>
-        <div><dt>Taxa de avaliação</dt><dd><%= fmt.pct(r.satisfacao.taxa_avaliacao) %></dd></div>
-      </dl>
-    </section>
-
-    <section class="cartao">
-      <h2>Atendimento humano</h2>
-      <p class="numero-grande"><%= fmt.pct(r.atendimento.taxa_resolucao_bot) %> <small>resolvidas pelo bot</small></p>
-      <dl class="detalhes">
-        <div><dt>Taxa de handoff</dt><dd><%= fmt.pct(r.atendimento.taxa_handoff) %> (<%= r.atendimento.conversas_com_pedido %> de <%= r.atendimento.conversas %>)</dd></div>
-        <div><dt>Pedidos de atendente</dt><dd><%= fmt.num(r.atendimento.pedidos) %></dd></div>
-        <div><dt>Pedidos atendidos</dt><dd><%= fmt.num(r.atendimento.pedidos_atendidos) %></dd></div>
-        <div><dt>Pedidos sem atendimento (voltaram ao bot)</dt><dd><%= fmt.num(r.atendimento.pedidos_abandonados) %></dd></div>
-        <div><dt>Pedidos ainda na fila</dt><dd><%= fmt.num(r.atendimento.pedidos_na_fila) %></dd></div>
-      </dl>
-    </section>
-
-    <section class="cartao">
-      <h2>Fila e atendimento</h2>
-      <p class="numero-grande"><%= fmt.num(r.fila.esperando_agora) %> <small>esperando agora</small></p>
-      <dl class="detalhes">
-        <% if (r.fila.mais_antiga_s !== null) { %><div><dt>Espera mais longa agora</dt><dd><%= fmt.duracao(r.fila.mais_antiga_s) %></dd></div><% } %>
-        <div><dt>Em atendimento agora</dt><dd><%= fmt.num(r.fila.em_atendimento_agora) %></dd></div>
-        <div><dt>Espera na fila (mediana)</dt><dd><%= fmt.duracao(r.fila.espera.mediana_s) %></dd></div>
-        <div><dt>Duração do atendimento (mediana)</dt><dd><%= fmt.duracao(r.duracao.mediana_s) %></dd></div>
-        <div><dt>Pedidos atendidos (base da espera)</dt><dd><%= fmt.num(r.fila.espera.n) %></dd></div>
-        <div><dt>Atendimentos concluídos (base da duração)</dt><dd><%= fmt.num(r.duracao.n) %></dd></div>
-        <div><dt>Atendimentos em andamento</dt><dd><%= fmt.num(r.duracao.em_andamento) %></dd></div>
-      </dl>
+    <section class="cartao overflow-hidden">
+      <div class="border-b border-slate-100 px-5 py-4">
+        <h2 class="text-base font-semibold text-slate-900">Perguntas sem resposta <span class="font-normal text-slate-500">(lacunas na base)</span></h2>
+        <p class="mt-1 text-sm text-slate-500">Perguntas que caíram no “não encontrei”, tiveram contexto insuficiente ou receberam 👎. Cadastre a resposta na base para o bot aprender.</p>
+      </div>
+      <% if (r.lacunas.length === 0) { %>
+        <p class="px-5 py-12 text-center text-sm text-slate-500">Nenhuma pergunta sem resposta no período. 🎉</p>
+      <% } else { %>
+        <div class="overflow-x-auto">
+          <table class="tabela">
+            <thead><tr><th>Pergunta</th><th class="num">Vezes</th><th class="hidden md:table-cell">Última vez</th><th>Motivo</th><th class="text-right print:hidden">Ação</th></tr></thead>
+            <tbody>
+              <% lacunasNaTela.forEach((l) => { %>
+                <tr>
+                  <td class="max-w-md font-medium text-slate-800 [overflow-wrap:anywhere]"><%= l.pergunta %></td>
+                  <td class="num"><%= l.vezes %></td>
+                  <td class="hidden whitespace-nowrap text-slate-500 md:table-cell"><%= fmt.dataHora(l.ultima) %></td>
+                  <td><div class="flex flex-wrap gap-1"><% l.motivos.forEach((m) => { %><span class="badge badge-motivo-<%= m %>"><%= motivos[m] %></span><% }) %></div></td>
+                  <td class="text-right print:hidden"><a class="btn btn-pequeno" href="<%= l.href %>"><%- include('partials/icone', { nome: 'mais', classe: 'size-3.5' }) %> Cadastrar na base</a></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% if (r.lacunas.length > lacunasNaTela.length) { %>
+          <p class="dica border-t border-slate-100 px-5 py-3">Mostrando <%= lacunasNaTela.length %> de <%= r.lacunas.length %> perguntas. O CSV “sem resposta” traz todas.</p>
+        <% } %>
+      <% } %>
     </section>
   </main>
-
-  <section class="graficos">
-    <figure class="cartao">
-      <figcaption>Conversas ativas por dia</figcaption>
-      <%- graficoConversas %>
-    </figure>
-    <figure class="cartao">
-      <figcaption>Mensagens do usuário por dia</figcaption>
-      <%- graficoMensagens %>
-    </figure>
-  </section>
-
-  <section class="lacunas">
-    <h2>Perguntas sem resposta <small>(lacunas na base)</small></h2>
-    <% if (r.lacunas.length === 0) { %>
-      <p class="vazio-lacunas">Nenhuma pergunta sem resposta no período.</p>
-    <% } else { %>
-      <div class="tabela-rolavel">
-      <table class="lista-conversas lista-lacunas">
-        <thead><tr><th>Pergunta</th><th class="num">Vezes</th><th class="col-ultima">Última vez</th><th>Motivo</th><th class="sem-impressao">Ação</th></tr></thead>
-        <tbody>
-          <% lacunasNaTela.forEach((l) => { %>
-            <tr>
-              <td class="col-pergunta"><%= l.pergunta %></td>
-              <td class="num"><%= l.vezes %></td>
-              <td class="col-ultima ultima-atividade"><%= fmt.dataHora(l.ultima) %></td>
-              <td><% l.motivos.forEach((m) => { %><span class="badge badge-motivo badge-motivo-<%= m %>"><%= motivos[m] %></span> <% }) %></td>
-              <td class="sem-impressao"><a href="<%= l.href %>">Cadastrar na base</a></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-      </div>
-      <% if (r.lacunas.length > lacunasNaTela.length) { %>
-        <p class="dica">Mostrando <%= lacunasNaTela.length %> de <%= r.lacunas.length %> perguntas. O CSV “sem resposta” traz todas.</p>
-      <% } %>
-    <% } %>
-  </section>
 
   <script>
     document.getElementById('imprimir').addEventListener('click', () => window.print());

@@ -1,0 +1,32 @@
+<%
+  // Barra de navegação de todas as telas logadas. Parâmetros: atendente, ativo ('conversas' | 'base' | 'metricas').
+  // Os links da base e das métricas só aparecem para administradores (o teste de fumaça confere isso).
+  const ehAdmin = atendente && atendente.papel === 'admin';
+  const iniciais = String((atendente && atendente.nome) || '?').trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+  const classeLink = (nome) => 'inline-flex items-center gap-2 rounded-lg px-3 py-2 font-medium transition ' +
+    (ativo === nome ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900');
+%>
+<header class="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur print:hidden">
+  <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2.5 sm:px-6">
+    <a href="/" class="mr-2 flex items-center gap-2.5 font-semibold text-slate-900">
+      <span class="grid size-8 place-items-center rounded-lg bg-indigo-600 text-white"><%- include('icone', { nome: 'chat', classe: 'size-4.5' }) %></span>
+      <span class="hidden leading-tight sm:block">Assistente Escolar<span class="block text-xs font-normal text-slate-500">Painel de atendimento</span></span>
+    </a>
+    <nav class="flex min-w-0 items-center gap-1 overflow-x-auto text-sm" aria-label="Principal">
+      <a href="/" class="<%= classeLink('conversas') %>" <%- ativo === 'conversas' ? 'aria-current="page"' : '' %>><%- include('icone', { nome: 'chat' }) %><span class="sr-only sm:not-sr-only">Conversas</span></a>
+      <% if (ehAdmin) { %>
+        <a href="/base" class="<%= classeLink('base') %>" <%- ativo === 'base' ? 'aria-current="page"' : '' %>><%- include('icone', { nome: 'livro' }) %><span class="sr-only md:not-sr-only">Base de conhecimento</span></a>
+        <a href="/metricas" class="<%= classeLink('metricas') %>" <%- ativo === 'metricas' ? 'aria-current="page"' : '' %>><%- include('icone', { nome: 'grafico' }) %><span class="sr-only sm:not-sr-only">Métricas</span></a>
+      <% } %>
+    </nav>
+    <div class="ml-auto flex items-center gap-2">
+      <div class="hidden items-center gap-2 lg:flex">
+        <span class="grid size-8 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600"><%= iniciais %></span>
+        <span class="text-sm leading-tight"><span class="block font-medium text-slate-800"><%= atendente.nome %></span><span class="block text-xs text-slate-500"><%= ehAdmin ? 'Administrador' : 'Atendente' %></span></span>
+      </div>
+      <form method="POST" action="/logout">
+        <button class="btn btn-fantasma btn-pequeno text-slate-600" title="Sair"><%- include('icone', { nome: 'sair' }) %><span class="hidden sm:inline">Sair</span></button>
+      </form>
+    </div>
+  </div>
+</header>

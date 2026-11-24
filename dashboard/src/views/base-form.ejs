@@ -1,67 +1,108 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= modo === 'novo' ? 'Novo item' : 'Editar item' %> — Base de conhecimento</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/style.css">
+  <%- include('partials/head', { titulo: (modo === 'novo' ? 'Novo item' : 'Editar item') + ' · Base de conhecimento' }) %>
 </head>
 <body>
-  <header>
-    <h1>
-      <%= modo === 'novo' ? 'Novo item da base' : 'Editar item da base' %>
+  <%- include('partials/topo', { atendente, ativo: 'base' }) %>
+
+  <main class="pagina max-w-4xl">
+    <a href="/base" class="mb-4 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800"><%- include('partials/icone', { nome: 'voltar' }) %> Base de conhecimento</a>
+
+    <div class="mb-6 flex flex-wrap items-center gap-3">
+      <h1><%= modo === 'novo' ? 'Novo item da base' : 'Editar item da base' %></h1>
       <% if (situacao) { %><span class="badge badge-<%= situacao.visual %>"><%= situacao.rotulo %></span><% } %>
-    </h1>
-    <div class="header-user">
-      <a href="/base">← Base de conhecimento</a>
-      <span><%= atendente.nome %></span>
-      <form method="POST" action="/logout"><button class="link-button">Sair</button></form>
     </div>
-  </header>
 
-  <% if (aviso) { %>
-    <div class="flash flash-<%= aviso.tipo %>" role="status"><%= aviso.texto %></div>
-  <% } %>
-  <% if (erroGeral) { %>
-    <div class="flash flash-erro" role="alert"><%= erroGeral %></div>
-  <% } %>
+    <%- include('partials/aviso', { aviso }) %>
+    <% if (erroGeral) { %>
+      <div class="flash flash-erro mb-6" role="alert"><%- include('partials/icone', { nome: 'alerta', classe: 'size-5' }) %><p><%= erroGeral %></p></div>
+    <% } %>
 
-  <main class="conteudo-form">
-    <form class="form-base" method="POST" action="<%= modo === 'novo' ? '/base' : '/base/' + id %>" id="form-item">
+    <% if (importado) { %>
+      <div class="flash <%= importado.excede ? 'flash-aviso' : 'flash-info' %> mb-6" role="status">
+        <%- include('partials/icone', { nome: 'documento', classe: 'size-5 mt-px' }) %>
+        <div class="space-y-1">
+          <p class="font-semibold">Texto extraído de “<%= importado.arquivo %>” (<%= importado.paginas %> <%= importado.paginas === 1 ? 'página' : 'páginas' %>, <%= importado.caracteres.toLocaleString('pt-BR') %> caracteres).</p>
+          <p>Revise antes de salvar: cabeçalhos, rodapés, números de página e tabelas podem ter vindo junto ou fora de ordem. Nada foi salvo ainda.</p>
+          <% if (importado.excede) { %>
+            <p class="font-semibold">O texto passa do limite de <%= limites.conteudo.toLocaleString('pt-BR') %> caracteres. Divida o documento em mais de um item (por capítulo, por exemplo) antes de salvar.</p>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+
+    <% if (modo === 'novo') { %>
+      <section class="cartao mb-6 p-5 sm:p-6" aria-labelledby="titulo-importar">
+        <div class="mb-4">
+          <h2 id="titulo-importar" class="text-base font-semibold text-slate-900">Importar de um PDF</h2>
+          <p class="mt-1 text-sm text-slate-500">O texto do PDF preenche o formulário abaixo para você revisar. Ele só vai para a base quando você clicar em Salvar.</p>
+        </div>
+        <form id="form-pdf" method="POST" action="/base/importar-pdf" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <input type="hidden" name="titulo" id="pdf-titulo" value="<%= valores.titulo %>">
+          <label for="arquivo" class="zona-arquivo" id="zona-arquivo">
+            <span class="grid size-11 place-items-center rounded-full bg-white text-indigo-600 shadow-xs ring-1 ring-slate-200"><%- include('partials/icone', { nome: 'upload', classe: 'size-5' }) %></span>
+            <span class="text-sm"><span class="font-semibold text-indigo-700">Escolha um arquivo</span> ou arraste o PDF para cá</span>
+            <span class="dica">Até <%= limitesPdf.megabytes %> MB e <%= limitesPdf.paginas %> páginas · PDFs com texto (documentos escaneados ainda não são suportados)</span>
+            <span id="pdf-carregando" class="mt-1 inline-flex items-center gap-2 text-sm font-medium text-indigo-700" hidden>
+              <span class="size-4 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600"></span> Extraindo o texto…
+            </span>
+          </label>
+          <input class="sr-only" type="file" id="arquivo" name="arquivo" accept="application/pdf,.pdf" required>
+          <noscript><button type="submit" class="btn mt-3">Enviar PDF</button></noscript>
+        </form>
+      </section>
+    <% } %>
+
+    <form class="cartao space-y-6 p-5 sm:p-6" method="POST" action="<%= modo === 'novo' ? '/base' : '/base/' + id %>" id="form-item">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
 
-      <label for="titulo">Título</label>
-      <input type="text" id="titulo" name="titulo" maxlength="<%= limites.titulo %>" value="<%= valores.titulo %>" required <%= valores.titulo ? '' : 'autofocus' %>>
-      <% if (erros.titulo) { %><p class="erro-campo"><%= erros.titulo %></p><% } %>
-      <p class="dica">O bot cita o título como fonte da resposta, por exemplo “(Fonte: Entrega de atestado médico)”. Escolha um título que faça sentido para quem lê.</p>
+      <div class="space-y-1.5">
+        <label class="rotulo" for="titulo">Título</label>
+        <input class="campo" type="text" id="titulo" name="titulo" maxlength="<%= limites.titulo %>" value="<%= valores.titulo %>" required <%= valores.titulo ? '' : 'autofocus' %>>
+        <% if (erros.titulo) { %><p class="erro-campo"><%= erros.titulo %></p><% } %>
+        <p class="dica">O bot cita o título como fonte da resposta, por exemplo “(Fonte: Entrega de atestado médico)”. Escolha um título que faça sentido para quem lê.</p>
+      </div>
 
-      <label for="conteudo">Conteúdo</label>
-      <textarea id="conteudo" name="conteudo" rows="14" maxlength="<%= limites.conteudo %>" required <%= (modo === 'novo' && valores.titulo && !valores.conteudo) ? 'autofocus' : '' %>><%= valores.conteudo %></textarea>
-      <span class="contador"><span id="contador-atual">0</span> / <%= limites.conteudo %> caracteres</span>
-      <% if (erros.conteudo) { %><p class="erro-campo"><%= erros.conteudo %></p><% } %>
-      <p class="dica">
-        Conteúdo curto (até 800 caracteres, como uma FAQ com pergunta e resposta juntas) vira um único trecho de busca.
-        Textos maiores são divididos em trechos de 800 caracteres, com 100 de sobreposição.
-      </p>
+      <div class="space-y-1.5">
+        <div class="flex items-end justify-between gap-3">
+          <label class="rotulo" for="conteudo">Conteúdo</label>
+          <span class="text-xs tabular-nums text-slate-500" id="contador"><span id="contador-atual">0</span> / <%= limites.conteudo.toLocaleString('pt-BR') %> caracteres</span>
+        </div>
+        <textarea class="campo min-h-72 resize-y font-mono text-[13px] leading-relaxed" id="conteudo" name="conteudo" rows="16" <%= importado && importado.excede ? '' : 'maxlength=' + limites.conteudo %> required <%= (modo === 'novo' && valores.titulo && !valores.conteudo) ? 'autofocus' : '' %>><%= valores.conteudo %></textarea>
+        <% if (erros.conteudo) { %><p class="erro-campo"><%= erros.conteudo %></p><% } %>
+        <p class="dica">
+          Conteúdo curto (até 800 caracteres, como uma FAQ com pergunta e resposta juntas) vira um único trecho de busca.
+          Textos maiores são divididos em trechos de 800 caracteres, com 100 de sobreposição.
+        </p>
+      </div>
 
       <% if (modo === 'editar') { %>
-        <p class="dica dica-destaque">
-          Mudar só o título não reindexa. Mudar o conteúdo reindexa: o item fica fora das respostas do bot por alguns segundos, até o n8n terminar.
-        </p>
+        <div class="flash flash-aviso"><%- include('partials/icone', { nome: 'info', classe: 'size-5' }) %>
+          <p>Mudar só o título não reindexa. Mudar o conteúdo reindexa: o item fica fora das respostas do bot por alguns segundos, até o n8n terminar.</p>
+        </div>
       <% } %>
 
-      <div class="form-acoes">
+      <div class="flex justify-end gap-2 border-t border-slate-100 pt-5">
         <a class="btn" href="/base">Cancelar</a>
-        <button type="submit" class="btn btn-primario" id="botao-salvar">Salvar</button>
+        <button type="submit" class="btn btn-primario" id="botao-salvar"><%- include('partials/icone', { nome: 'check' }) %> Salvar</button>
       </div>
     </form>
   </main>
 
   <script>
+    const LIMITE = <%= limites.conteudo %>;
     const campo = document.getElementById('conteudo');
-    const contador = document.getElementById('contador-atual');
-    const atualizarContador = () => { contador.textContent = String(campo.value.length); };
+    const contador = document.getElementById('contador');
+    const contadorAtual = document.getElementById('contador-atual');
+    const atualizarContador = () => {
+      contadorAtual.textContent = campo.value.length.toLocaleString('pt-BR');
+      const passou = campo.value.length > LIMITE;
+      contador.classList.toggle('text-red-700', passou);
+      contador.classList.toggle('font-semibold', passou);
+      contador.classList.toggle('text-slate-500', !passou);
+    };
     campo.addEventListener('input', atualizarContador);
     atualizarContador();
 
@@ -71,6 +112,37 @@
       botao.disabled = true;
       botao.textContent = 'Salvando…';
     });
+
+    // Importar PDF: envia assim que o arquivo é escolhido (ou solto na área).
+    const formPdf = document.getElementById('form-pdf');
+    if (formPdf) {
+      const entrada = document.getElementById('arquivo');
+      const zona = document.getElementById('zona-arquivo');
+      const carregando = document.getElementById('pdf-carregando');
+      const tituloOculto = document.getElementById('pdf-titulo');
+      const tituloVisivel = document.getElementById('titulo');
+
+      const enviarPdf = () => {
+        if (!entrada.files || !entrada.files.length) return;
+        tituloOculto.value = tituloVisivel.value; // mantém um título já digitado (ou vindo das Métricas)
+        carregando.hidden = false;
+        zona.setAttribute('aria-busy', 'true');
+        formPdf.submit();
+      };
+      entrada.addEventListener('change', enviarPdf);
+
+      ['dragenter', 'dragover'].forEach((tipo) => zona.addEventListener(tipo, (e) => {
+        e.preventDefault();
+        zona.classList.add('arrastando');
+      }));
+      ['dragleave', 'drop'].forEach((tipo) => zona.addEventListener(tipo, () => zona.classList.remove('arrastando')));
+      zona.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+        entrada.files = e.dataTransfer.files;
+        enviarPdf();
+      });
+    }
   </script>
 </body>
 </html>

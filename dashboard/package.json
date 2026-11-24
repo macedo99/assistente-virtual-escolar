@@ -3,13 +3,22 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "build:css": "tailwindcss -i src/estilos/app.css -o src/public/app.css --minify",
+    "dev:css": "tailwindcss -i src/estilos/app.css -o src/public/app.css --watch",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "ejs": "^3.1.10",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
+    "multer": "2.5.0",
+    "pdf-parse": "2.4.5",
     "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.5",
+    "tailwindcss": "4.3.5"
   }
 }

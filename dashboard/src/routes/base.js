@@ -1,7 +1,9 @@
 const express = require('express');
+const multer = require('multer');
 const pool = require('../db');
 const base = require('../base');
 const ingestao = require('../ingestao');
+const pdf = require('../pdf');
 const { exigirCsrf } = require('../csrf');
 const { exigirAdmin } = require('../admin');
 const { formatarHoraCompleta } = require('../formato');
@@ -45,6 +47,8 @@ function dadosDoFormulario(req, extras) {
     erroGeral: '',
     situacao: null,
     limites: { titulo: base.TITULO_MAXIMO, conteudo: base.CONTEUDO_MAXIMO },
+    limitesPdf: { megabytes: pdf.TAMANHO_MAXIMO_BYTES / (1024 * 1024), paginas: pdf.PAGINAS_MAXIMAS },
+    importado: null, // { arquivo, paginas, caracteres, excede } depois de importar um PDF
     atendente: req.session.atendente,
     aviso: consumirAviso(req),
     ...extras,
@@ -86,6 +90,52 @@ router.get('/base/novo', exigirAdmin, (req, res) => {
   const pedido = (req.query || {}).titulo;
   const titulo = typeof pedido === 'string' ? pedido.replace(/\s+/g, ' ').trim().slice(0, base.TITULO_MAXIMO) : '';
   res.render('base-form', dadosDoFormulario(req, { modo: 'novo', valores: { titulo, conteudo: '' } }));
+});
+
+// Upload do PDF: fica só na memória (nada é gravado em disco) e só um arquivo por vez.
+const receberPdf = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: pdf.TAMANHO_MAXIMO_BYTES, files: 1, fields: 5, fieldSize: 4096 },
+}).single('arquivo');
+
+// Roda o multer e transforma os erros dele (arquivo grande demais etc.) num recado na própria tela,
+// em vez de um erro genérico. O token CSRF chega no mesmo formulário multipart, então só pode ser
+// conferido DEPOIS do multer ler o corpo.
+function receberUpload(req, res, next) {
+  receberPdf(req, res, (err) => {
+    if (!err) return next();
+    const mensagem = err.code === 'LIMIT_FILE_SIZE'
+      ? `O arquivo passa de ${pdf.TAMANHO_MAXIMO_BYTES / (1024 * 1024)} MB. Envie um PDF menor ou divida o documento.`
+      : 'Não consegui receber o arquivo. Tente de novo.';
+    if (!err.code) console.error('Upload de PDF falhou:', err.message);
+    res.status(400).render('base-form', dadosDoFormulario(req, { erroGeral: mensagem }));
+  });
+}
+
+// Importar PDF: extrai o texto e devolve o formulário de "Novo item" PREENCHIDO, para revisão.
+// Nada é salvo aqui — o item só entra na base (e é indexado) quando o administrador clica em Salvar.
+router.post('/base/importar-pdf', exigirAdmin, receberUpload, exigirCsrf, async (req, res, next) => {
+  const tituloInformado = typeof req.body.titulo === 'string' ? req.body.titulo.replace(/\s+/g, ' ').trim().slice(0, base.TITULO_MAXIMO) : '';
+  const voltarComErro = (mensagem) => res.status(400).render('base-form', dadosDoFormulario(req, {
+    valores: { titulo: tituloInformado, conteudo: '' },
+    erroGeral: mensagem,
+  }));
+
+  if (!req.file || !req.file.buffer || req.file.size === 0) return voltarComErro('Escolha um arquivo PDF para importar.');
+
+  // O nome vem do navegador do usuário: só serve para mostrar na tela e sugerir o título.
+  const arquivo = Buffer.from(req.file.originalname || 'arquivo.pdf', 'latin1').toString('utf8').slice(0, 200);
+  try {
+    const { texto, paginas } = await pdf.extrairTexto(req.file.buffer);
+    const conteudo = base.normalizarTexto(texto);
+    res.render('base-form', dadosDoFormulario(req, {
+      valores: { titulo: tituloInformado || pdf.tituloDoArquivo(arquivo, base.TITULO_MAXIMO), conteudo },
+      importado: { arquivo, paginas, caracteres: conteudo.length, excede: conteudo.length > base.CONTEUDO_MAXIMO },
+    }));
+  } catch (err) {
+    if (err instanceof pdf.ErroPdf) return voltarComErro(err.message);
+    next(err);
+  }
 });
 
 router.post('/base', exigirAdmin, exigirCsrf, async (req, res, next) => {

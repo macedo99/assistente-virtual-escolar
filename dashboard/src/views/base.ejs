@@ -1,78 +1,87 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Base de conhecimento — Dashboard</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/style.css">
+  <%- include('partials/head', { titulo: 'Base de conhecimento' }) %>
 </head>
 <body>
-  <header>
-    <h1>Base de conhecimento</h1>
-    <div class="header-user">
-      <a href="/">← Conversas</a>
-      <a href="/metricas">Métricas</a>
-      <span><%= atendente.nome %></span>
-      <form method="POST" action="/logout"><button class="link-button">Sair</button></form>
+  <%- include('partials/topo', { atendente, ativo: 'base' }) %>
+
+  <main class="pagina">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1>Base de conhecimento</h1>
+        <p class="mt-1 text-sm text-slate-500">FAQs e manuais que o bot usa para responder. Cada item é dividido em trechos e indexado.</p>
+      </div>
+      <a class="btn btn-primario" href="/base/novo"><%- include('partials/icone', { nome: 'mais' }) %> Novo item</a>
     </div>
-  </header>
 
-  <% if (aviso) { %>
-    <div class="flash flash-<%= aviso.tipo %>" role="status"><%= aviso.texto %></div>
-  <% } %>
+    <%- include('partials/aviso', { aviso }) %>
 
-  <div class="resumo">
-    <span class="resumo-item resumo-indexado"><strong id="cont-indexado"><%= contagem.indexado %></strong> indexados</span>
-    <span class="resumo-item resumo-indexando"><strong id="cont-indexando"><%= contagem.indexando %></strong> indexando</span>
-    <span class="resumo-item resumo-problema"><strong id="cont-problema"><%= contagem.problema %></strong> com problema</span>
-    <a class="btn btn-primario" href="/base/novo">Novo item</a>
-    <span class="atualizacao">Status atualiza sozinho a cada 4 s · última atualização às <span id="atualizada-em"><%= atualizadaEm %></span></span>
-  </div>
+    <div class="mb-6 grid grid-cols-3 gap-3 sm:gap-4">
+      <div class="cartao flex items-center gap-4 p-3 sm:p-5">
+        <span class="hidden size-11 place-items-center rounded-xl sm:grid bg-emerald-50 text-emerald-600"><%- include('partials/icone', { nome: 'check', classe: 'size-5' }) %></span>
+        <div><p class="resumo-numero" id="cont-indexado"><%= contagem.indexado %></p><p class="text-xs text-slate-500 sm:text-sm">indexados</p></div>
+      </div>
+      <div class="cartao flex items-center gap-4 p-3 sm:p-5">
+        <span class="hidden size-11 place-items-center rounded-xl sm:grid bg-amber-50 text-amber-600"><%- include('partials/icone', { nome: 'atualizar', classe: 'size-5' }) %></span>
+        <div><p class="resumo-numero" id="cont-indexando"><%= contagem.indexando %></p><p class="text-xs text-slate-500 sm:text-sm">indexando</p></div>
+      </div>
+      <div class="cartao flex items-center gap-4 p-3 sm:p-5">
+        <span class="hidden size-11 place-items-center rounded-xl sm:grid bg-red-50 text-red-600"><%- include('partials/icone', { nome: 'alerta', classe: 'size-5' }) %></span>
+        <div><p class="resumo-numero" id="cont-problema"><%= contagem.problema %></p><p class="text-xs text-slate-500 sm:text-sm">com problema</p></div>
+      </div>
+    </div>
 
-  <div class="tabela-rolavel">
-  <table class="lista-conversas lista-base">
-    <thead>
-      <tr><th>Título</th><th>Status</th><th class="col-trechos num">Trechos</th><th class="col-tamanho num">Tamanho</th><th class="col-atualizado">Atualizado</th><th>Ações</th></tr>
-    </thead>
-    <tbody id="itens">
-      <% if (itens.length === 0) { %>
-        <tr><td colspan="6" class="vazio">Nenhum item na base ainda. Clique em “Novo item” para cadastrar o primeiro.</td></tr>
-      <% } %>
-      <% itens.forEach(i => { %>
-        <tr data-id="<%= i.id %>" data-status="<%= i.status %>">
-          <td class="col-titulo"><a href="/base/<%= i.id %>/editar"><%= i.titulo %></a></td>
-          <td><span class="badge badge-<%= i.visual %>"><%= i.rotulo %></span><small class="espera"><%= i.detalhe %></small></td>
-          <td class="col-trechos num"><%= i.n_trechos %></td>
-          <td class="col-tamanho num"><%= i.tamanho %> car.</td>
-          <td class="col-atualizado ultima-atividade"><%= i.atualizado_em_fmt %></td>
-          <td>
-            <div class="acoes-linha">
-              <a href="/base/<%= i.id %>/editar">Editar</a>
-              <form method="POST" action="/base/<%= i.id %>/reindexar">
-                <input type="hidden" name="_csrf" value="<%= csrf %>">
-                <button type="submit" class="link-acao" data-reindexar <%= i.pode_reindexar ? '' : 'disabled' %> title="<%= i.pode_reindexar ? 'Gerar os embeddings deste item de novo' : 'Já está sendo indexado: espere terminar' %>">Reindexar</button>
-              </form>
-              <form method="POST" action="/base/<%= i.id %>/excluir" data-confirmar="Excluir “<%= i.titulo %>”? O bot deixa de usar este conteúdo e os trechos dele são apagados.">
-                <input type="hidden" name="_csrf" value="<%= csrf %>">
-                <button type="submit" class="link-acao perigo">Excluir</button>
-              </form>
-            </div>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
-  </div>
+    <div class="cartao overflow-hidden">
+      <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+        <p class="text-sm font-medium text-slate-700"><%= itens.length %> <%= itens.length === 1 ? 'item' : 'itens' %></p>
+        <p class="text-xs text-slate-400">Status atualiza sozinho a cada 4 s · <span id="atualizada-em"><%= atualizadaEm %></span></p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="tabela">
+          <thead>
+            <tr>
+              <th>Título</th>
+              <th>Status</th>
+              <th class="num hidden sm:table-cell">Trechos</th>
+              <th class="num hidden lg:table-cell">Tamanho</th>
+              <th class="hidden md:table-cell">Atualizado</th>
+              <th class="text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="itens">
+            <% if (itens.length === 0) { %>
+              <tr><td colspan="6" class="py-16 text-center text-slate-500">Nenhum item na base ainda. Clique em “Novo item” para cadastrar o primeiro — ou importe um PDF.</td></tr>
+            <% } %>
+            <% itens.forEach(i => { %>
+              <tr data-id="<%= i.id %>" data-status="<%= i.status %>">
+                <td class="max-w-xs"><a class="block truncate font-medium text-slate-900 hover:text-indigo-700" href="/base/<%= i.id %>/editar"><%= i.titulo %></a></td>
+                <td><span class="badge badge-<%= i.visual %>"><%= i.rotulo %></span><small class="espera mt-1 block text-xs text-red-700 empty:hidden"><%= i.detalhe %></small></td>
+                <td class="col-trechos num hidden sm:table-cell"><%= i.n_trechos %></td>
+                <td class="col-tamanho num hidden text-slate-500 lg:table-cell"><%= i.tamanho %> car.</td>
+                <td class="col-atualizado hidden whitespace-nowrap text-slate-500 md:table-cell"><%= i.atualizado_em_fmt %></td>
+                <td>
+                  <div class="flex items-center justify-end gap-1.5">
+                    <a class="btn btn-pequeno" href="/base/<%= i.id %>/editar" title="Editar"><%- include('partials/icone', { nome: 'lapis', classe: 'size-3.5' }) %><span class="hidden xl:inline">Editar</span></a>
+                    <form method="POST" action="/base/<%= i.id %>/reindexar">
+                      <input type="hidden" name="_csrf" value="<%= csrf %>">
+                      <button type="submit" class="btn btn-pequeno" data-reindexar <%= i.pode_reindexar ? '' : 'disabled' %> title="<%= i.pode_reindexar ? 'Gerar os embeddings deste item de novo' : 'Já está sendo indexado: espere terminar' %>"><%- include('partials/icone', { nome: 'atualizar', classe: 'size-3.5' }) %><span class="hidden xl:inline">Reindexar</span></button>
+                    </form>
+                    <form method="POST" action="/base/<%= i.id %>/excluir" data-confirmar="Excluir “<%= i.titulo %>”? O bot deixa de usar este conteúdo e os trechos dele são apagados." data-confirmar-botao="Excluir" data-confirmar-perigo="1">
+                      <input type="hidden" name="_csrf" value="<%= csrf %>">
+                      <button type="submit" class="btn btn-pequeno btn-perigo" title="Excluir"><%- include('partials/icone', { nome: 'lixeira', classe: 'size-3.5' }) %><span class="hidden xl:inline">Excluir</span></button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
 
   <script>
-    // Botões com data-confirmar pedem uma confirmação antes de enviar o formulário.
-    document.querySelectorAll('form[data-confirmar]').forEach((form) => {
-      form.addEventListener('submit', (e) => {
-        if (!window.confirm(form.dataset.confirmar)) e.preventDefault();
-      });
-    });
-
     // Atualiza o status de cada item (Indexando… → Indexado) sem recarregar a página.
     // Só textContent: títulos e textos vêm do banco e nunca devem ser interpretados como HTML.
     const INTERVALO_MS = 4000;

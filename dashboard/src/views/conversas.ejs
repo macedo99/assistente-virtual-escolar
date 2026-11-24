@@ -1,56 +1,85 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= contagem.aguardando > 0 ? '(' + contagem.aguardando + ') ' : '' %>Conversas — Dashboard</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/style.css">
+  <%- include('partials/head', { titulo: (contagem.aguardando > 0 ? '(' + contagem.aguardando + ') ' : '') + 'Conversas' }) %>
 </head>
 <body>
-  <header>
-    <h1>Conversas</h1>
-    <div class="header-user">
-      <% if (atendente.papel === 'admin') { %><a href="/metricas">Métricas</a><a href="/base">Base de conhecimento</a><% } %>
-      <span><%= atendente.nome %></span>
-      <form method="POST" action="/logout"><button class="link-button">Sair</button></form>
+  <%- include('partials/topo', { atendente, ativo: 'conversas' }) %>
+
+  <main class="pagina">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1>Conversas</h1>
+        <p class="mt-1 text-sm text-slate-500">Conversas ativas no Telegram. Quem pediu um atendente aparece primeiro.</p>
+      </div>
+      <p class="flex items-center gap-2 text-xs text-slate-500">
+        <span class="relative flex size-2"><span class="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex size-2 rounded-full bg-emerald-500"></span></span>
+        Ao vivo · atualiza a cada 5 s · <%= atualizadaEm %>
+      </p>
     </div>
-  </header>
 
-  <% if (aviso) { %>
-    <div class="flash flash-<%= aviso.tipo %>" role="status"><%= aviso.texto %></div>
-  <% } %>
+    <%- include('partials/aviso', { aviso }) %>
 
-  <div class="resumo">
-    <span class="resumo-item resumo-aguardando"><strong><%= contagem.aguardando %></strong> aguardando atendente</span>
-    <span class="resumo-item resumo-humano"><strong><%= contagem.humano %></strong> em atendimento humano</span>
-    <span class="resumo-item resumo-bot"><strong><%= contagem.bot %></strong> só com o bot</span>
-    <span class="atualizacao">Atualiza sozinha a cada 5 s · última atualização às <%= atualizadaEm %></span>
-  </div>
+    <div class="mb-6 grid grid-cols-3 gap-3 sm:gap-4">
+      <div class="cartao flex items-center gap-4 p-3 sm:p-5 <%= contagem.aguardando > 0 ? 'ring-2 ring-amber-300' : '' %>">
+        <span class="hidden size-11 place-items-center rounded-xl sm:grid bg-amber-50 text-amber-600"><%- include('partials/icone', { nome: 'relogio', classe: 'size-5' }) %></span>
+        <div><p class="resumo-numero"><%= contagem.aguardando %></p><p class="text-xs text-slate-500 sm:text-sm">aguardando atendente</p></div>
+      </div>
+      <div class="cartao flex items-center gap-4 p-3 sm:p-5">
+        <span class="hidden size-11 place-items-center rounded-xl sm:grid bg-indigo-50 text-indigo-600"><%- include('partials/icone', { nome: 'usuarios', classe: 'size-5' }) %></span>
+        <div><p class="resumo-numero"><%= contagem.humano %></p><p class="text-xs text-slate-500 sm:text-sm">em atendimento humano</p></div>
+      </div>
+      <div class="cartao flex items-center gap-4 p-3 sm:p-5">
+        <span class="hidden size-11 place-items-center rounded-xl sm:grid bg-slate-100 text-slate-600"><%- include('partials/icone', { nome: 'robo', classe: 'size-5' }) %></span>
+        <div><p class="resumo-numero"><%= contagem.bot %></p><p class="text-xs text-slate-500 sm:text-sm">só com o bot</p></div>
+      </div>
+    </div>
 
-  <div class="tabela-rolavel">
-  <table class="lista-conversas">
-    <thead>
-      <tr><th>Usuário</th><th class="col-papel">Papel</th><th>Status</th><th class="col-atendente">Atendente</th><th class="col-ultima">Última mensagem</th><th class="col-atividade">Última atividade</th><th></th></tr>
-    </thead>
-    <tbody>
+    <div class="cartao overflow-hidden">
       <% if (conversas.length === 0) { %>
-        <tr><td colspan="7" class="vazio">Nenhuma conversa ativa no momento.</td></tr>
+        <div class="flex flex-col items-center px-6 py-16 text-center">
+          <span class="grid size-12 place-items-center rounded-full bg-slate-100 text-slate-400"><%- include('partials/icone', { nome: 'chat', classe: 'size-6' }) %></span>
+          <p class="mt-4 font-medium text-slate-700">Nenhuma conversa ativa no momento.</p>
+          <p class="mt-1 text-sm text-slate-500">Quando alguém escrever para o bot, a conversa aparece aqui.</p>
+        </div>
+      <% } else { %>
+        <div class="overflow-x-auto">
+          <table class="tabela">
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>Status</th>
+                <th class="hidden md:table-cell">Atendente</th>
+                <th class="hidden lg:table-cell">Última mensagem</th>
+                <th class="hidden sm:table-cell">Última atividade</th>
+                <th><span class="sr-only">Ação</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% conversas.forEach(c => { %>
+                <tr class="<%= c.status === 'aguardando_atendente' ? 'bg-amber-50/50' : '' %>">
+                  <td>
+                    <p class="font-medium text-slate-900"><%= c.usuario_nome %></p>
+                    <p class="text-xs capitalize text-slate-500"><%= c.usuario_papel %></p>
+                  </td>
+                  <td>
+                    <span class="badge badge-<%= c.status %>"><%= c.status_rotulo %></span>
+                    <% if (c.espera) { %><p class="mt-1 text-xs font-medium text-amber-700">há <%= c.espera %></p><% } %>
+                  </td>
+                  <td class="hidden whitespace-nowrap text-slate-600 md:table-cell"><%= c.atendente_exibicao || '—' %></td>
+                  <td class="hidden max-w-xs truncate text-slate-600 lg:table-cell"><%= c.ultima_mensagem || '—' %></td>
+                  <td class="hidden whitespace-nowrap text-slate-500 sm:table-cell"><%= c.ultima_em_fmt %></td>
+                  <td class="text-right">
+                    <a class="btn btn-pequeno <%= c.status === 'aguardando_atendente' ? 'btn-primario' : '' %>" href="/conversas/<%= c.id %>"><%= c.status === 'aguardando_atendente' ? 'Atender' : 'Abrir' %></a>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
       <% } %>
-      <% conversas.forEach(c => { %>
-        <tr class="status-<%= c.status %>">
-          <td><%= c.usuario_nome %></td>
-          <td class="col-papel"><%= c.usuario_papel %></td>
-          <td><span class="badge"><%= c.status_rotulo %></span><% if (c.espera) { %> <small class="espera">há <%= c.espera %></small><% } %></td>
-          <td class="atendente-coluna col-atendente"><%= c.atendente_exibicao || '—' %></td>
-          <td class="ultima-mensagem col-ultima"><%= c.ultima_mensagem || '—' %></td>
-          <td class="ultima-atividade col-atividade"><%= c.ultima_em_fmt %></td>
-          <td><a href="/conversas/<%= c.id %>"><%= c.status === 'aguardando_atendente' ? 'Atender' : 'Abrir' %></a></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
-  </div>
+    </div>
+  </main>
 
   <script>
     // Recarrega a lista periodicamente pra refletir conversas/mensagens novas.
