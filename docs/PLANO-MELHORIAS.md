@@ -8,7 +8,7 @@ usuário vê e usa todo dia, depois o que fecha brechas de segurança, por fim o
 | 1 | Dashboard: visual novo + importar PDF | Usabilidade; texto entrando na base sem revisão (para PDFs) | **Feita** |
 | 2 | Segurança do acesso | Papel decidido por palavra-chave; login sem limite de tentativas; `SESSION_SECRET` padrão; cookie sem `Secure` | **Feita** |
 | 3 | Builds reproduzíveis | Imagens em `:latest`; sem `package-lock.json` | **Feita** |
-| 4 | Testes automatizados e CI | Sem testes de unidade; nada roda sozinho em PR | Parcial (`npm test` criado) |
+| 4 | Testes automatizados e CI | Sem testes de unidade; nada roda sozinho em PR | **Feita** |
 | 5 | Qualidade do LLM / PLN | Sem testes de prompt injection; sem golden set; corte de trechos por caractere | A fazer |
 | 6 | PDFs avançados (opcional) | PDFs escaneados; documentos maiores que 50 mil caracteres | A fazer |
 
@@ -63,14 +63,16 @@ Para aplicar: gerar o `SESSION_SECRET` no `.env`, `docker compose up -d --build 
 - Como conferir a versão em uso e atualizar com segurança: `docs/ATUALIZAR-VERSOES.md`
   (atenção: o n8n não pode voltar para uma versão mais antiga).
 
-## Etapa 4 — Testes automatizados e CI
+## Etapa 4 — Testes automatizados e CI (feita)
 
-1. Testes de unidade com `node:test` para as regras de `base.js` (validação, estados da indexação),
-   `metricas.js` (classificação de respostas, agrupamento de lacunas), `csrf.js` e `formato.js`.
-2. GitHub Actions em cada PR: `npm ci`, `npm test`, `npm run build:css`, e o teste de fumaça contra um
-   Postgres de serviço (com os scripts `verificar-*` que não dependem do n8n).
-3. Contrato do embedding: o `schema.sql` cria `VECTOR(1536)`, mas o bge-m3 gera 1024 — alinhar o schema com
-   o `ALTER` do Passo 5 (o `verificar-base.js` já confere a coluna).
+- 43 testes de unidade (`npm test`, `node:test`, sem dependência nova): base de conhecimento, permissões do
+  atendimento, métricas (datas, períodos, percentil, pareamento da fila, CSV com proteção contra fórmula),
+  CSRF, formatação de datas, PDF, limite de login, configuração de segurança e versões fixas.
+- GitHub Actions (`.github/workflows/ci.yml`) em cada push na `main` e em cada PR: testes de unidade, build do
+  CSS, schema + migrações num Postgres com pgvector, os três `verificar-*`, teste de fumaça com o dashboard de
+  pé, build da imagem Docker e validação do `docker-compose.yml`. Actions fixadas pelo commit.
+- Contrato do embedding: `schema.sql` agora cria `VECTOR(1024)` (bge-m3), igual ao que o `verificar-base.js` exige.
+- Como rodar tudo localmente e proteger a `main`: `docs/TESTES.md`.
 
 ## Etapa 5 — Qualidade do LLM e do PLN
 

@@ -57,6 +57,6 @@ CREATE TABLE trechos_embeddings (
     id               BIGSERIAL PRIMARY KEY,
     item_id          BIGINT NOT NULL REFERENCES itens_base_conhecimento(id) ON DELETE CASCADE,
     conteudo_trecho  TEXT NOT NULL,
-    embedding        VECTOR(1536),
+    embedding        VECTOR(1024),    -- bge-m3 (Ollama) gera 1024 dimensões
     criado_em        TIMESTAMPTZ NOT NULL DEFAULT now()
 );

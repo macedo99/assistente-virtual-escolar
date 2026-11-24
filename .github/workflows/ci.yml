@@ -1,0 +1,119 @@
+# Verificações automáticas do dashboard: rodam em cada push na main e em cada pull request.
+# Para rodar o mesmo localmente, veja docs/TESTES.md.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    name: Testes do dashboard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: dashboard
+
+    # Postgres de teste com pgvector, na MESMA versão do docker-compose.yml.
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg17
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: chatbot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d chatbot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_NAME: chatbot
+      DB_USER: ci
+      DB_PASSWORD: ci
+      PGPASSWORD: ci
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22.23.5 # a mesma do Dockerfile
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Instalar dependências (package-lock.json)
+        run: npm ci
+
+      - name: Testes de unidade
+        run: npm test
+
+      - name: Gerar o CSS (Tailwind)
+        run: npm run build:css
+
+      - name: Criar o banco de teste (schema + migrações)
+        run: |
+          psql -h 127.0.0.1 -U ci -d chatbot -v ON_ERROR_STOP=1 -q -c "CREATE EXTENSION IF NOT EXISTS vector"
+          psql -h 127.0.0.1 -U ci -d chatbot -v ON_ERROR_STOP=1 -q -f ../schema.sql
+          node scripts/aplicar-migracao.js
+
+      - name: Verificar o banco, a base de conhecimento e as métricas
+        run: |
+          node scripts/verificar-banco.js
+          node scripts/verificar-base.js
+          node scripts/verificar-metricas.js
+
+      - name: Subir o dashboard e rodar o teste de fumaça
+        run: |
+          node scripts/criar-atendente.js "Admin CI" "admin@ci.local" "Senha-do-CI-123" admin
+          node scripts/criar-atendente.js "Atendente CI" "atendente@ci.local" "Senha-do-CI-123" atendente
+          # Uma conversa, para o teste de fumaça abrir uma conversa de verdade.
+          psql -h 127.0.0.1 -U ci -d chatbot -v ON_ERROR_STOP=1 -q -c "
+            INSERT INTO usuarios (telegram_chat_id, nome) VALUES (1001, 'Professora CI');
+            INSERT INTO conversas (usuario_id, status) SELECT id, 'aguardando_atendente' FROM usuarios WHERE telegram_chat_id = 1001;
+            INSERT INTO mensagens (conversa_id, remetente, conteudo) SELECT id, 'usuario', '/humano' FROM conversas;"
+          # n8n e Telegram apontam para um endereço que não responde: as ações que dependem deles falham
+          # de forma controlada, e o teste de fumaça não executa nenhuma.
+          export SESSION_SECRET="$(openssl rand -hex 32)" PORT=3000 \
+            INGESTAO_URL=http://127.0.0.1:9/webhook INGESTAO_TOKEN=ci \
+            TELEGRAM_BOT_TOKEN=ci TELEGRAM_API_URL=http://127.0.0.1:9
+          node src/server.js > servidor.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:3000/login && break; sleep 1; done
+          node scripts/testar-dashboard.js "admin@ci.local" "Senha-do-CI-123" "atendente@ci.local" "Senha-do-CI-123"
+
+      - name: Log do dashboard (só quando algo falhou)
+        if: failure()
+        run: cat servidor.log || true
+
+  docker:
+    name: Imagem Docker e docker-compose
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: docker-compose.yml válido
+        run: docker compose --env-file env.example config --quiet
+
+      - name: Construir a imagem do dashboard
+        run: docker build -t dashboard-ci dashboard
+
+      - name: A imagem recusa subir sem SESSION_SECRET
+        run: |
+          if docker run --rm dashboard-ci; then
+            echo "O dashboard subiu sem SESSION_SECRET (deveria recusar)."; exit 1
+          fi
