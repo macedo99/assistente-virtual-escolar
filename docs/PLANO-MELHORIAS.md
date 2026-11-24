@@ -9,7 +9,7 @@ usuário vê e usa todo dia, depois o que fecha brechas de segurança, por fim o
 | 2 | Segurança do acesso | Papel decidido por palavra-chave; login sem limite de tentativas; `SESSION_SECRET` padrão; cookie sem `Secure` | **Feita** |
 | 3 | Builds reproduzíveis | Imagens em `:latest`; sem `package-lock.json` | **Feita** |
 | 4 | Testes automatizados e CI | Sem testes de unidade; nada roda sozinho em PR | **Feita** |
-| 5 | Qualidade do LLM / PLN | Sem testes de prompt injection; sem golden set; corte de trechos por caractere | A fazer |
+| 5 | Qualidade do LLM / PLN | Sem testes de prompt injection; sem golden set; corte de trechos por caractere | **Em andamento** |
 | 6 | PDFs avançados (opcional) | PDFs escaneados; documentos maiores que 50 mil caracteres | A fazer |
 
 ---
@@ -82,8 +82,12 @@ Para aplicar: gerar o `SESSION_SECRET` no `.env`, `docker compose up -d --build 
    contexto nunca é instrução.
 3. **Golden set** (perguntas reais com os fatos esperados) e **red-team set** (injeções diretas e indiretas,
    fora do escopo), rodados a cada mudança de prompt, modelo ou divisão em trechos, medindo taxa de acerto.
-4. Divisão em trechos respeitando frases e parágrafos (hoje corta em 800 caracteres fixos).
-5. Métricas: agrupar lacunas por similaridade (embeddings), não só por texto igual.
+4. **Feito**: divisão em trechos por parágrafos e frases, sem cortar palavras, com sobreposição da última frase
+   (`dashboard/sql-n8n/reindexar_divide_em_trechos.js`, 10 testes em `test/trechos.test.js`). Precisa ser colada no
+   nó “Divide em trechos” do n8n, e os itens com mais de 800 caracteres reindexados.
+5. **Feito**: avaliação da busca (`scripts/avaliar-busca.js`, guia em `avaliacao/README.md`): acerto@1/@3/@5 e MRR
+   para um conjunto de perguntas reais escrito pela equipe.
+6. Métricas: agrupar lacunas por similaridade (embeddings), não só por texto igual.
 
 ## Etapa 6 — PDFs avançados (opcional)
 

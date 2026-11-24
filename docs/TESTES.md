@@ -9,8 +9,9 @@ Há três camadas. As duas primeiras rodam sozinhas no GitHub (`.github/workflow
 | Integração | Schema + migrações, regras do banco (gatilhos, conversa ativa única), base de conhecimento e métricas com dados controlados | Sim (Postgres de teste; tudo em transação desfeita no final) | `node scripts/verificar-banco.js`, `verificar-base.js`, `verificar-metricas.js` |
 | Fumaça (ponta a ponta) | O dashboard de pé, por HTTP: login, sessão, CSRF, permissões de admin e de atendente, cabeçalhos de segurança | Sim | `node scripts/testar-dashboard.js "admin@..." "senha" "atendente@..." "senha"` |
 
-Fora do CI (dependem de serviços reais): `scripts/verificar-n8n.js` (webhook e embeddings do n8n/Ollama) e
-`scripts/verificar-telegram.js` (token do bot).
+Fora do CI (dependem de serviços reais): `scripts/verificar-n8n.js` (webhook e embeddings do n8n/Ollama),
+`scripts/verificar-telegram.js` (token do bot) e `scripts/avaliar-busca.js` (qualidade da busca com o modelo real;
+veja `avaliacao/README.md`).
 
 ## O que o CI faz
 
