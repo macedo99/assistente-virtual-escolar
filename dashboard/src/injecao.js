@@ -31,4 +31,16 @@ const MOTIVOS_INJECAO = {
 
 const descreverMotivos = (motivos) => motivos.map((m) => MOTIVOS_INJECAO[m] || m).join('; ');
 
-module.exports = { detectarInjecao, normalizarParaDeteccao, descreverMotivos, MOTIVOS_INJECAO, PREFIXO_INJECAO, RESPOSTA_INJECAO };
+// Nomes curtos, para o cartão Segurança das Métricas.
+const ROTULOS_INJECAO = {
+  ignorar_instrucoes: 'Ignorar instruções',
+  revelar_prompt: 'Revelar o prompt',
+  mudar_papel: 'Mudar de papel',
+  modo_sem_restricoes: 'Modo sem restrições',
+  extrair_dados: 'Extrair dados ou senhas',
+  instrucao_escondida: 'Ordem escondida em texto',
+  marcacao_falsa: 'Imitar o sistema',
+  desconhecido: 'Tipo não identificado',
+};
+
+module.exports = { detectarInjecao, normalizarParaDeteccao, descreverMotivos, MOTIVOS_INJECAO, ROTULOS_INJECAO, PREFIXO_INJECAO, RESPOSTA_INJECAO };

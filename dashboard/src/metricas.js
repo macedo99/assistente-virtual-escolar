@@ -1,7 +1,7 @@
 // Métricas do dashboard: volume, satisfação, atendimento humano e perguntas sem resposta.
 
 const { AVISOS } = require('./atendimento');
-const { PREFIXO_INJECAO } = require('./injecao');
+const { PREFIXO_INJECAO, ROTULOS_INJECAO, detectarInjecao } = require('./injecao');
 
 const FUSO = 'America/Sao_Paulo';
 const DESLOCAMENTO = '-03:00';
@@ -141,7 +141,7 @@ const SQL_MENSAGENS = `
             FROM mensagens u
            WHERE u.conversa_id = b.conversa_id AND u.remetente = 'usuario' AND u.id < b.id
            ORDER BY u.id DESC LIMIT 1) AS pergunta_em,
-         CASE WHEN b.tipo IN ('fallback', 'sem_contexto') OR b.feedback = 'negativo'
+         CASE WHEN b.tipo IN ('fallback', 'sem_contexto', 'injecao') OR b.feedback = 'negativo'
               THEN (SELECT left(u.conteudo, 500)
                       FROM mensagens u
                      WHERE u.conversa_id = b.conversa_id AND u.remetente = 'usuario' AND u.id < b.id
@@ -175,6 +175,9 @@ const SQL_NOVOS = `
     (SELECT count(*)::int FROM usuarios WHERE criado_em >= $1 AND criado_em < $2) AS usuarios_novos,
     (SELECT count(*)::int FROM conversas WHERE iniciada_em >= $1 AND iniciada_em < $2) AS conversas_novas`;
 
+// Itens da base (todos, agora): o cartão Segurança procura neles ordens escondidas para o bot.
+const SQL_ITENS_BASE = 'SELECT id, titulo, conteudo FROM itens_base_conhecimento ORDER BY id';
+
 const SQL_CONVERSAS_INFO = `
   SELECT c.id, c.status, c.usuario_id, u.nome, u.papel
   FROM conversas c
@@ -199,11 +202,12 @@ function conversasDoPeriodo(mensagens, eventos, periodo) {
 async function coletar(db, periodo) {
   const { ini, fim } = instantes(periodo);
   const janela = [ini.toISOString(), fim.toISOString()];
-  const [mensagens, eventos, fila, novos] = await Promise.all([
+  const [mensagens, eventos, fila, novos, itens] = await Promise.all([
     db.query(SQL_MENSAGENS, [...janela, AVISOS.assumiu('%'), AVISOS.devolveu(), AVISOS.encerrou(), `${PREFIXO_FALLBACK}%`, PADROES_SEM_CONTEXTO, `${PREFIXO_INJECAO}%`]),
     db.query(SQL_EVENTOS, janela),
     db.query(SQL_FILA_AGORA),
     db.query(SQL_NOVOS, janela),
+    db.query(SQL_ITENS_BASE),
   ]);
 
   const ids = [...conversasDoPeriodo(mensagens.rows, eventos.rows, periodo)];
@@ -215,6 +219,7 @@ async function coletar(db, periodo) {
     fila: fila.rows,
     novos: novos.rows[0] || { usuarios_novos: 0, conversas_novas: 0 },
     conversas: conversas.rows,
+    itens: itens.rows,
   };
 }
 
@@ -377,6 +382,30 @@ function calcular(dados, periodo, agora = new Date()) {
       };
     });
 
+  // ---- segurança: tentativas de prompt injection bloqueadas (a mensagem do usuário que causou o aviso passa de
+  // novo pelo detector, para saber o tipo) e itens da base que têm, agora, ordens escondidas para o bot.
+  const tentativas = doBot
+    .filter((m) => m.tipo === 'injecao')
+    .map((m) => {
+      const info = infoConversa.get(String(m.conversa_id)) || {};
+      const motivos = m.pergunta ? detectarInjecao(m.pergunta).motivos : [];
+      return {
+        em: new Date(m.enviada_em),
+        conversa_id: String(m.conversa_id),
+        usuario_id: info.usuario_id === undefined ? null : String(info.usuario_id),
+        usuario: info.nome || '—',
+        mensagem: m.pergunta ? String(m.pergunta).replace(/\s+/g, ' ').trim() : '(mensagem não encontrada)',
+        motivos: motivos.length ? motivos : ['desconhecido'],
+      };
+    })
+    .sort((a, b) => b.em - a.em);
+  const porMotivo = new Map();
+  for (const t of tentativas) for (const motivo of t.motivos) porMotivo.set(motivo, (porMotivo.get(motivo) || 0) + 1);
+  const itensSuspeitos = (dados.itens || [])
+    .map((item) => ({ id: String(item.id), titulo: item.titulo, r: detectarInjecao(`${item.titulo}\n${item.conteudo}`, { origem: 'documento' }) }))
+    .filter((x) => x.r.injecao)
+    .map((x) => ({ id: x.id, titulo: x.titulo, motivos: x.r.motivos.map((m) => ROTULOS_INJECAO[m] || m) }));
+
   return {
     periodo: { de: periodo.de, ate: periodo.ate, dias: dias.length },
     volume: {
@@ -421,6 +450,15 @@ function calcular(dados, periodo, agora = new Date()) {
       ...resumoTempos(temposResposta),
       limite_s: LIMITE_RESPOSTA_S,
       dentro_do_limite_pct: razao(temposResposta.filter((s) => s <= LIMITE_RESPOSTA_S).length, temposResposta.length),
+    },
+    seguranca: {
+      tentativas: tentativas.length,
+      usuarios: new Set(tentativas.map((t) => t.usuario_id).filter(Boolean)).size,
+      por_motivo: [...porMotivo.entries()]
+        .map(([motivo, vezes]) => ({ motivo, rotulo: ROTULOS_INJECAO[motivo] || motivo, vezes }))
+        .sort((a, b) => b.vezes - a.vezes || a.rotulo.localeCompare(b.rotulo, 'pt-BR')),
+      lista: tentativas.map((t) => ({ ...t, motivos: t.motivos.map((m) => ROTULOS_INJECAO[m] || m) })),
+      itens_suspeitos: itensSuspeitos,
     },
     serie,
     lacunas,
@@ -560,6 +598,12 @@ function csvConversas(r) {
   return montarCsv([cabecalho, ...linhas]);
 }
 
+function csvSeguranca(r, formatarDataHoraCompleta) {
+  const cabecalho = ['Quando', 'Usuário', 'Conversa', 'Tipo de ataque', 'Mensagem'];
+  const linhas = r.seguranca.lista.map((t) => [formatarDataHoraCompleta(t.em), t.usuario, t.conversa_id, t.motivos.join(', '), t.mensagem]);
+  return montarCsv([cabecalho, ...linhas]);
+}
+
 function csvLacunas(r, formatarDataHoraCompleta) {
   const cabecalho = ['Pergunta', 'Vezes', 'Última vez', 'Motivos'];
   const linhas = r.lacunas.map((l) => [l.pergunta, l.vezes, formatarDataHoraCompleta(l.ultima), l.motivos.map((m) => MOTIVOS[m]).join(', ')]);
@@ -595,4 +639,5 @@ module.exports = {
   csvResumo,
   csvConversas,
   csvLacunas,
+  csvSeguranca,
 };

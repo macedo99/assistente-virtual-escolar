@@ -6,7 +6,8 @@ const { formatarDataHora, formatarHora } = require('../formato');
 
 const router = express.Router();
 
-const TIPOS_CSV = ['resumo', 'conversas', 'lacunas'];
+const TIPOS_CSV = ['resumo', 'conversas', 'lacunas', 'seguranca'];
+const TENTATIVAS_NA_TELA = 10; // o CSV traz todas
 const LINHAS_LACUNAS_NA_TELA = 50; // o CSV traz todas
 
 // "18/11/2026 21:05" — com o ano, para o CSV e para o cabeçalho da impressão
@@ -29,6 +30,7 @@ router.get('/metricas', exigirAdmin, async (req, res, next) => {
       geradoEm: dataHoraCompleta(agora),
       motivos: metricas.MOTIVOS,
       lacunasNaTela: r.lacunas.slice(0, LINHAS_LACUNAS_NA_TELA),
+      tentativasNaTela: r.seguranca.lista.slice(0, TENTATIVAS_NA_TELA),
       graficoConversas: metricas.graficoBarras(r.serie, 'conversas', 'Conversas ativas por dia'),
       graficoMensagens: metricas.graficoBarras(r.serie, 'mensagens', 'Mensagens do usuário por dia'),
       fmt: {
@@ -44,13 +46,13 @@ router.get('/metricas', exigirAdmin, async (req, res, next) => {
   }
 });
 
-// Exportação: /metricas/exportar.csv?tipo=resumo|conversas|lacunas&de=...&ate=...
+// Exportação: /metricas/exportar.csv?tipo=resumo|conversas|lacunas|seguranca&de=...&ate=...
 // (O PDF sai do botão "Imprimir / PDF" da tela, pelo "Salvar como PDF" do navegador.)
 router.get('/metricas/exportar.csv', exigirAdmin, async (req, res, next) => {
   try {
     const consulta = req.query || {};
     const tipo = String(consulta.tipo || '');
-    if (!TIPOS_CSV.includes(tipo)) return res.status(400).send('Tipo de relatório inválido. Use resumo, conversas ou lacunas.');
+    if (!TIPOS_CSV.includes(tipo)) return res.status(400).send('Tipo de relatório inválido. Use resumo, conversas, lacunas ou seguranca.');
 
     const agora = new Date();
     const lido = metricas.lerPeriodo(consulta, agora);
@@ -63,6 +65,7 @@ router.get('/metricas/exportar.csv', exigirAdmin, async (req, res, next) => {
       resumo: () => metricas.csvResumo(r, dataHoraCompleta(agora)),
       conversas: () => metricas.csvConversas(r),
       lacunas: () => metricas.csvLacunas(r, dataHoraCompleta),
+      seguranca: () => metricas.csvSeguranca(r, dataHoraCompleta),
     }[tipo]();
 
     res.set('Content-Type', 'text/csv; charset=utf-8');

@@ -260,6 +260,17 @@ const verificacoes = [
     exigir(cadastro.status === 200 && cadastro.texto.includes('value="Pergunta de teste"'), 'o link "Cadastrar na base" deveria pré-preencher o título');
   }],
 
+  ['Administrador: as Métricas mostram o cartão Segurança e o CSV de segurança sai no formato certo', async () => {
+    if (!estado.cookie) return PULA_SEM_LOGIN;
+    if (!estado.admin) return 'pulado: o primeiro atendente informado não é administrador';
+    const tela = await pedir('GET', '/metricas', { cookie: estado.cookie });
+    exigir(tela.status === 200 && tela.texto.includes('id="titulo-seguranca"'), 'a tela de métricas não tem o cartão Segurança');
+    exigir(tela.texto.includes('tentativas bloqueadas no período'), 'o cartão Segurança não mostra as tentativas bloqueadas');
+    const csv = await pedir('GET', '/metricas/exportar.csv?tipo=seguranca', { cookie: estado.cookie });
+    exigir(csv.status === 200, `CSV de segurança: esperava 200, veio ${csv.status}`);
+    exigir(csv.texto.replace(/^\uFEFF/, '').startsWith('Quando;Usuário;Conversa;Tipo de ataque;Mensagem'), 'o CSV de segurança deveria começar pelo cabeçalho das tentativas');
+  }],
+
   ['Administrador: texto da base com ordem escondida para o bot é barrado com alerta (nada é salvo)', async () => {
     if (!estado.cookie) return PULA_SEM_LOGIN;
     if (!estado.admin) return 'pulado: o primeiro atendente informado não é administrador';

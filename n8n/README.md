@@ -48,7 +48,8 @@ fica em `dashboard/sql-n8n/detectar_injecao.js` (o mesmo que os testes e o dashb
      aí: o LLM não é chamado.
    - **falso** → segue o fluxo normal (Buscar usuário, RAG etc.).
 3. A resposta começa com `⚠️ Possível tentativa de prompt injection`. O dashboard reconhece esse começo e mostra
-   em **Métricas → Volume → Tentativas de prompt injection bloqueadas**. Se mudar o texto, mude só o que vem depois.
+   no cartão **Métricas → Segurança** (tentativas, usuários, tipo de ataque, últimas tentativas com link para a
+   conversa e o CSV “segurança”). Se mudar o texto, mude só o que vem depois.
 
 Confira as regras com `cd dashboard && node scripts/avaliar-injecao.js` (red-team e golden set em `avaliacao/`).
 Ao exportar os workflows, o nó entra no repositório como os outros.

@@ -84,7 +84,8 @@ Para aplicar: gerar o `SESSION_SECRET` no `.env`, `docker compose up -d --build 
    injeção”, `dashboard/sql-n8n/detectar_injecao.js`, passo a passo em `n8n/README.md`). Red-team (42 ataques) e
    golden set (47 perguntas legítimas) em `avaliacao/`, conferidos no CI: 100% de detecção, 0 falso positivo.
    A base de conhecimento avisa o administrador sobre ordens escondidas em textos e PDFs (injeção indireta), e as
-   Métricas contam as tentativas bloqueadas. **Falta**: os `fatos` do golden set e a avaliação das respostas
+   Métricas têm um cartão **Segurança**: tentativas bloqueadas no período, usuários que tentaram, tipos de ataque,
+   últimas tentativas (com link para a conversa), itens da base com trechos suspeitos e o CSV “segurança”. **Falta**: os `fatos` do golden set e a avaliação das respostas
    finais, que dependem dos workflows no repositório.
 4. **Feito**: divisão em trechos por parágrafos e frases, sem cortar palavras, com sobreposição da última frase
    (`dashboard/sql-n8n/reindexar_divide_em_trechos.js`, 10 testes em `test/trechos.test.js`). Precisa ser colada no
