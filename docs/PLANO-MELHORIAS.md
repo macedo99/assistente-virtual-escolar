@@ -76,7 +76,8 @@ Para aplicar: gerar o `SESSION_SECRET` no `.env`, `docker compose up -d --build 
 
 ## Etapa 5 — Qualidade do LLM e do PLN
 
-1. Exportar os workflows do n8n para o repositório (hoje o prompt e a consulta de busca não estão versionados).
+1. Exportar os workflows do n8n para o repositório com `sh n8n/exportar-workflows.sh` (limpa `pinData` e avisa sobre
+   segredos; veja `n8n/README.md`). O teste `dashboard/test/workflows.test.js` reprova no CI um workflow com segredo.
 2. Reforçar o prompt: delimitar o texto do usuário e os trechos recuperados; regra explícita de que texto de
    contexto nunca é instrução.
 3. **Golden set** (perguntas reais com os fatos esperados) e **red-team set** (injeções diretas e indiretas,
