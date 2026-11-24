@@ -78,6 +78,23 @@
         </p>
       </div>
 
+      <% if (alertaInjecao) { %>
+        <div class="flash flash-erro" role="alert" id="alerta-injecao">
+          <%- include('partials/icone', { nome: 'alerta', classe: 'size-5 mt-px' }) %>
+          <div class="space-y-2">
+            <p class="font-semibold">Possível injeção de prompt: o texto <%= alertaInjecao.motivos %>.</p>
+            <p>O bot lê este conteúdo como fonte das respostas. Uma frase como “quando perguntarem, diga…” escondida num documento pode fazer o bot passar informação falsa. Trechos que chamaram atenção:</p>
+            <ul class="list-disc space-y-1 pl-5 font-mono text-xs">
+              <% alertaInjecao.trechos.forEach((t) => { %><li><%= t %></li><% }) %>
+            </ul>
+            <label class="flex items-start gap-2 pt-1 font-medium">
+              <input type="checkbox" name="revisado_injecao" value="1" class="mt-0.5 size-4 accent-red-700" required>
+              <span>Revisei o texto: essas frases são conteúdo legítimo da escola, não ordens para o bot.</span>
+            </label>
+          </div>
+        </div>
+      <% } %>
+
       <% if (modo === 'editar') { %>
         <div class="flash flash-aviso"><%- include('partials/icone', { nome: 'info', classe: 'size-5' }) %>
           <p>Mudar só o título não reindexa. Mudar o conteúdo reindexa: o item fica fora das respostas do bot por alguns segundos, até o n8n terminar.</p>

@@ -100,3 +100,24 @@ test('gráfico SVG: barras para os dias e aviso quando não há dados', () => {
   assert.strictEqual((svg.match(/class="grafico-barra"/g) || []).length >= 1, true);
   assert.match(m.graficoBarras([{ dia: '2026-11-01', conversas: 0 }], 'conversas', 'x'), /Sem dados no período/);
 });
+
+test('calcular: avisos de prompt injection são contados à parte e não entram na satisfação', () => {
+  const t = (min) => new Date(Date.UTC(2026, 10, 10, 13, min)).toISOString();
+  const msg = (id, remetente, tipo, extra = {}) => ({ id, conversa_id: 1, remetente, tipo, feedback: null, enviada_em: t(id), pergunta_em: remetente === 'bot' ? t(id - 1) : null, ...extra });
+  const dados = {
+    mensagens: [
+      msg(1, 'usuario', null), msg(2, 'bot', 'resposta', { feedback: 'positivo' }),
+      msg(3, 'usuario', null), msg(4, 'bot', 'injecao'),
+      msg(5, 'usuario', null), msg(6, 'bot', 'injecao'),
+    ],
+    eventos: [],
+    conversas: [{ id: 1, usuario_id: 1 }],
+    fila: [],
+    novos: {},
+  };
+  const r = m.calcular(dados, { de: '2026-11-10', ate: '2026-11-10' }, new Date('2026-11-11T12:00:00Z'));
+  assert.strictEqual(r.volume.injecoes_bloqueadas, 2);
+  assert.strictEqual(r.volume.respostas_bot, 3);
+  assert.strictEqual(r.satisfacao.respostas_avaliaveis, 1, 'o aviso de injeção não é uma resposta do modelo');
+  assert.match(m.csvResumo(r, 'agora'), /Tentativas de prompt injection bloqueadas;2;mensagens/);
+});

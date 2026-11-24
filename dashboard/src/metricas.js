@@ -1,6 +1,7 @@
 // Métricas do dashboard: volume, satisfação, atendimento humano e perguntas sem resposta.
 
 const { AVISOS } = require('./atendimento');
+const { PREFIXO_INJECAO } = require('./injecao');
 
 const FUSO = 'America/Sao_Paulo';
 const DESLOCAMENTO = '-03:00';
@@ -110,15 +111,17 @@ function atalhos(agora = new Date()) {
 
 // Classifica cada mensagem do BOT:
 //   aviso         → os recados que o dashboard grava ("fulano entrou na conversa", devolveu, encerrou)
+//   injecao       → o aviso de "possível tentativa de prompt injection" (nó "Detecta injeção" do n8n)
 //   fallback      → o "não encontrei uma resposta confiável"
 //   sem_contexto  → resposta do modelo dizendo que o contexto não tem a informação (heurística)
 //   resposta      → resposta normal do RAG
 // Parâmetros: $3 modelo do aviso "assumiu", $4 aviso "devolveu", $5 aviso "encerrou", $6 início do fallback
-// (com %), $7 lista de padrões da heurística.
+// (com %), $7 lista de padrões da heurística, $8 início do aviso de prompt injection (com %).
 const TIPO_SQL = `
     CASE
       WHEN m.remetente <> 'bot' THEN NULL
       WHEN m.conteudo LIKE $3 OR m.conteudo = $4 OR m.conteudo = $5 THEN 'aviso'
+      WHEN m.conteudo LIKE $8 THEN 'injecao'
       WHEN m.conteudo LIKE $6 THEN 'fallback'
       WHEN m.conteudo ILIKE ANY ($7::text[]) THEN 'sem_contexto'
       ELSE 'resposta'
@@ -197,7 +200,7 @@ async function coletar(db, periodo) {
   const { ini, fim } = instantes(periodo);
   const janela = [ini.toISOString(), fim.toISOString()];
   const [mensagens, eventos, fila, novos] = await Promise.all([
-    db.query(SQL_MENSAGENS, [...janela, AVISOS.assumiu('%'), AVISOS.devolveu(), AVISOS.encerrou(), `${PREFIXO_FALLBACK}%`, PADROES_SEM_CONTEXTO]),
+    db.query(SQL_MENSAGENS, [...janela, AVISOS.assumiu('%'), AVISOS.devolveu(), AVISOS.encerrou(), `${PREFIXO_FALLBACK}%`, PADROES_SEM_CONTEXTO, `${PREFIXO_INJECAO}%`]),
     db.query(SQL_EVENTOS, janela),
     db.query(SQL_FILA_AGORA),
     db.query(SQL_NOVOS, janela),
@@ -380,6 +383,8 @@ function calcular(dados, periodo, agora = new Date()) {
       conversas_ativas: populacao.size,
       mensagens_usuario: doUsuario.length,
       respostas_bot: doBot.length,
+      // respostas com o aviso de prompt injection (o LLM nem foi chamado)
+      injecoes_bloqueadas: doBot.filter((m) => m.tipo === 'injecao').length,
       usuarios_ativos: usuariosAtivos.size,
       usuarios_novos: Number(dados.novos.usuarios_novos) || 0,
       conversas_novas: Number(dados.novos.conversas_novas) || 0,
@@ -520,6 +525,7 @@ function csvResumo(r, geradoEm) {
     ['Conversas novas', r.volume.conversas_novas, 'conversas'],
     ['Mensagens do usuário', r.volume.mensagens_usuario, 'mensagens'],
     ['Respostas do bot', r.volume.respostas_bot, 'mensagens'],
+    ['Tentativas de prompt injection bloqueadas', r.volume.injecoes_bloqueadas, 'mensagens'],
     ['Usuários ativos', r.volume.usuarios_ativos, 'usuários'],
     ['Usuários novos', r.volume.usuarios_novos, 'usuários'],
     ['Avaliações positivas (👍)', r.satisfacao.positivas, 'avaliações'],

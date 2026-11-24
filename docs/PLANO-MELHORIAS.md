@@ -80,8 +80,12 @@ Para aplicar: gerar o `SESSION_SECRET` no `.env`, `docker compose up -d --build 
    segredos; veja `n8n/README.md`). O teste `dashboard/test/workflows.test.js` reprova no CI um workflow com segredo.
 2. Reforçar o prompt: delimitar o texto do usuário e os trechos recuperados; regra explícita de que texto de
    contexto nunca é instrução.
-3. **Golden set** (perguntas reais com os fatos esperados) e **red-team set** (injeções diretas e indiretas,
-   fora do escopo), rodados a cada mudança de prompt, modelo ou divisão em trechos, medindo taxa de acerto.
+3. **Feito (detecção)**: o bot avisa “⚠️ Possível tentativa de prompt injection” sem chamar o LLM (nó “Detecta
+   injeção”, `dashboard/sql-n8n/detectar_injecao.js`, passo a passo em `n8n/README.md`). Red-team (42 ataques) e
+   golden set (47 perguntas legítimas) em `avaliacao/`, conferidos no CI: 100% de detecção, 0 falso positivo.
+   A base de conhecimento avisa o administrador sobre ordens escondidas em textos e PDFs (injeção indireta), e as
+   Métricas contam as tentativas bloqueadas. **Falta**: os `fatos` do golden set e a avaliação das respostas
+   finais, que dependem dos workflows no repositório.
 4. **Feito**: divisão em trechos por parágrafos e frases, sem cortar palavras, com sobreposição da última frase
    (`dashboard/sql-n8n/reindexar_divide_em_trechos.js`, 10 testes em `test/trechos.test.js`). Precisa ser colada no
    nó “Divide em trechos” do n8n, e os itens com mais de 800 caracteres reindexados.

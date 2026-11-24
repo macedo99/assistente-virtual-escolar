@@ -61,7 +61,7 @@ const EVENTOS = [
 ];
 
 const ESPERADO = {
-  volume: { conversas_ativas: 3, mensagens_usuario: 9, respostas_bot: 6, usuarios_ativos: 3, usuarios_novos: 1, conversas_novas: 1 },
+  volume: { conversas_ativas: 3, mensagens_usuario: 9, respostas_bot: 6, injecoes_bloqueadas: 0, usuarios_ativos: 3, usuarios_novos: 1, conversas_novas: 1 },
   satisfacao: { positivas: 2, negativas: 1, avaliadas: 3, respostas_avaliaveis: 4, percentual: (2 / 3) * 100, taxa_avaliacao: 75 },
   atendimento: {
     conversas: 3, conversas_com_pedido: 1, pedidos: 1, pedidos_atendidos: 1, pedidos_abandonados: 0, pedidos_na_fila: 0,

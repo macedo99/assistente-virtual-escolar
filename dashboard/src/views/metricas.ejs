@@ -46,6 +46,7 @@
         { titulo: 'Volume', icone: 'chat', cor: 'bg-indigo-50 text-indigo-600', numero: fmt.num(r.volume.conversas_ativas), legenda: 'conversas ativas', linhas: [
           ['Mensagens do usuário', fmt.num(r.volume.mensagens_usuario)],
           ['Respostas do bot', fmt.num(r.volume.respostas_bot)],
+          ['Tentativas de prompt injection bloqueadas', fmt.num(r.volume.injecoes_bloqueadas)],
           ['Usuários ativos', fmt.num(r.volume.usuarios_ativos)],
           ['Conversas novas', fmt.num(r.volume.conversas_novas)],
           ['Usuários novos', fmt.num(r.volume.usuarios_novos)],

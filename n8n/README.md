@@ -34,3 +34,21 @@ docker compose exec n8n n8n import:workflow --separate --input=/tmp/workflows
 ```
 
 Depois, no n8n, associe as credenciais (Telegram, Postgres, Header Auth da ingestão) a cada nó que pedir.
+
+## Nó “Detecta injeção” (prompt injection)
+
+O bot precisa **dizer** quando uma mensagem é uma tentativa de prompt injection, sem chamar o LLM. O código
+fica em `dashboard/sql-n8n/detectar_injecao.js` (o mesmo que os testes e o dashboard usam). No workflow do bot:
+
+1. Logo depois do **Telegram Trigger**, adicione um nó **Code** chamado “Detecta injeção” (modo *Run Once for
+   All Items*) e cole tudo o que vem depois da linha `// -----` do arquivo.
+2. Depois dele, um nó **IF** com a condição `{{ $json.injecao }}` é verdadeiro:
+   - **verdadeiro** → **Telegram: Send Message** com o texto `{{ $json.resposta_injecao }}`, e o nó
+     **Gravar mensagem** gravando a mensagem do usuário e esta resposta (`remetente = 'bot'`). O fluxo termina
+     aí: o LLM não é chamado.
+   - **falso** → segue o fluxo normal (Buscar usuário, RAG etc.).
+3. A resposta começa com `⚠️ Possível tentativa de prompt injection`. O dashboard reconhece esse começo e mostra
+   em **Métricas → Volume → Tentativas de prompt injection bloqueadas**. Se mudar o texto, mude só o que vem depois.
+
+Confira as regras com `cd dashboard && node scripts/avaliar-injecao.js` (red-team e golden set em `avaliacao/`).
+Ao exportar os workflows, o nó entra no repositório como os outros.
